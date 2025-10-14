@@ -1,0 +1,5 @@
+<Project>
+    <PropertyGroup>
+        <UseMultiToolTask>true</UseMultiToolTask>
+    </PropertyGroup>
+</Project>

@@ -1276,8 +1276,9 @@ private:
     uint32 _timeSyncNextCounter;
     uint32 _timeSyncTimer;
 
-    uint32 _orderCounter;
     bool _isBot;
+
+    uint32 _orderCounter;
 
     WorldSession(WorldSession const& right) = delete;
     WorldSession& operator=(WorldSession const& right) = delete;
