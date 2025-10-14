@@ -23,6 +23,13 @@
 #include <sys/stat.h>
 #include <vector>
 
+//added
+#ifdef _WIN32 
+#include <Windows.h>
+#include <direct.h>
+#define mkdir _mkdir
+#endif
+
 #ifdef WIN32
 #include <Windows.h>
 #include <direct.h>
