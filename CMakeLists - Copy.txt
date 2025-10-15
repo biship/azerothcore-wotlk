@@ -11,29 +11,16 @@
 #
 
 # Require version Cmake
-#cmake_minimum_required(VERSION 3.16...3.22)
-cmake_minimum_required(VERSION 3.16...3.50)
-
-# Modern Windows and C++/C standards
-set(CMAKE_SYSTEM_VERSION 10.0.22621.0 CACHE STRING "Windows SDK version" FORCE)
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_C_STANDARD 17)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_C_EXTENSIONS OFF)
+cmake_minimum_required(VERSION 3.16...3.22)
 
 message(STATUS "CMake version: ${CMAKE_VERSION}")
 
 # CMake policies (can not be handled elsewhere)
 cmake_policy(SET CMP0005 NEW)
 
-#if (POLICY CMP0153)
-#  cmake_policy(SET CMP0153 OLD)
-#endif()
-
-# lets cmake use the old FindBoost module
-cmake_policy(SET CMP0167 OLD)
+if (POLICY CMP0153)
+  cmake_policy(SET CMP0153 OLD)
+endif()
 
 # Set projectname (must be done AFTER setting configurationtypes)
 project(AzerothCore VERSION 3.0.0 LANGUAGES CXX C)
@@ -119,7 +106,6 @@ include(ConfigInstall)
 CU_RUN_HOOK("AFTER_LOAD_CMAKE_MODULES")
 
 find_package(PCHSupport)
-
 find_package(MySQL REQUIRED)
 
 if(UNIX AND WITH_PERFTOOLS)

@@ -9,10 +9,19 @@
 # WITHOUT ANY WARRANTY, to the extent permitted by law; without even the
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #
+#set(Boost_DEBUG 1)
 
 if(WIN32)
   if(DEFINED ENV{Boost_ROOT})
+    message(NOTICE "Boost_ROOT defined.")
     set(Boost_ROOT $ENV{Boost_ROOT})
+	# --- Fix Boost detection for MSVC 2022 + C++23 ---
+    #set(Boost_NO_BOOST_CMAKE ON)
+    #set(Boost_NO_SYSTEM_PATHS OFF)
+    #set(Boost_DETAILED_FAILURE_MSG OFF)
+    #set(BOOST_ROOT "C:/ProgramData/boost")
+    #set(BOOST_INCLUDEDIR "C:\\ProgramData\\boost")
+    #set(BOOST_LIBRARYDIR "C:\\ProgramData\\boost\\lib64-msvc-14.3")
   endif()
 
   set(Boost_USE_STATIC_LIBS        ON)
@@ -33,11 +42,15 @@ endif()
 
 # Boost.System is header-only since 1.69; do not require it explicitly.
 find_package(Boost ${BOOST_REQUIRED_VERSION} REQUIRED COMPONENTS filesystem program_options iostreams regex thread)
+# Modern Boost (≥1.82) has many header-only libs; request only those actually needed.
+#find_package(Boost ${BOOST_REQUIRED_VERSION} REQUIRED COMPONENTS filesystem program_options)
 
 if(NOT Boost_FOUND)
   if(NOT DEFINED ENV{Boost_ROOT} AND NOT DEFINED Boost_DIR AND NOT DEFINED BOOST_ROOT AND NOT DEFINED BOOSTROOT)
     message(FATAL_ERROR "No Boost_ROOT environment variable could be found! Please make sure it is set and the points to your Boost installation.")
   endif()
+else()
+  message(NOTICE "Boost_ROOT good.")
 endif()
 
 add_library(boost INTERFACE)
