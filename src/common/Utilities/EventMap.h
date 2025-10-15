@@ -128,6 +128,13 @@ public:
     */
     void ScheduleEvent(EventId eventId, Milliseconds time, GroupIndex group = 0u, PhaseIndex phase = 0u);
 
+    // ScheduleEvent
+    [[deprecated("Use ScheduleEvent with std::chrono::milliseconds instead.")]]
+    void ScheduleEvent(EventId eventId, uint32_t timeMs, GroupIndex group = 0u, PhaseIndex phase = 0u)
+    {
+        ScheduleEvent(eventId, Milliseconds(timeMs), group, phase);
+    }
+
     /**
     * @name ScheduleEvent
     * @brief Schedules a new event. An existing event is not canceled.
@@ -139,6 +146,12 @@ public:
     */
     void ScheduleEvent(EventId eventId, Milliseconds minTime, Milliseconds maxTime, GroupIndex group = 0u, PhaseIndex phase = 0u);
 
+    [[deprecated("Use ScheduleEvent with std::chrono::milliseconds instead.")]]
+    void ScheduleEvent(EventId eventId, uint32_t minTimeMs, uint32_t maxTimeMs, GroupIndex group = 0u, PhaseIndex phase = 0u)
+    {
+        ScheduleEvent(eventId, Milliseconds(minTimeMs), Milliseconds(maxTimeMs), group, phase);
+    }
+
     /**
     * @name RescheduleEvent
     * @brief Cancels the given event and reschedules it.
@@ -148,6 +161,13 @@ public:
     * @param phase The phase in which the event can occur. Has to be between 1 and 8. 0 means it can occur in all phases.
     */
     void RescheduleEvent(EventId eventId, Milliseconds time, GroupIndex group = 0u, PhaseIndex phase = 0u);
+
+    // RescheduleEvent
+    [[deprecated("Use RescheduleEvent with std::chrono::milliseconds instead.")]]
+    void RescheduleEvent(EventId eventId, uint32_t timeMs, GroupIndex group = 0u, PhaseIndex phase = 0u)
+    {
+        RescheduleEvent(eventId, Milliseconds(timeMs), group, phase);
+    }
 
     /**
     * @name RescheduleEvent
@@ -160,20 +180,18 @@ public:
     */
     void RescheduleEvent(EventId eventId, Milliseconds minTime, Milliseconds maxTime, GroupIndex group = 0u, PhaseIndex phase = 0u);
 
+    [[deprecated("Use RescheduleEvent with std::chrono::milliseconds instead.")]]
+    void RescheduleEvent(EventId eventId, uint32_t minTimeMs, uint32_t maxTimeMs, GroupIndex group = 0u, PhaseIndex phase = 0u)
+    {
+        RescheduleEvent(eventId, Milliseconds(minTimeMs), Milliseconds(maxTimeMs), group, phase);
+    }
+
     /**
     * @name Repeat
     * @brief Repeats the most recently executed event.
     * @param time Time until the event occurs as std::chrono type.
     */
     void Repeat(Milliseconds time);
-
-    /**
-    * @name Repeat
-    * @brief Repeats the most recently executed event.
-    * @param minTime The minimum time until the event occurs as std::chrono type.
-    * @param maxTime The maximum time until the event occurs as std::chrono type.
-    */
-    void Repeat(Milliseconds minTime, Milliseconds maxTime);
 
     /**
     * @name RepeatEvent (Single Delay)
@@ -185,6 +203,14 @@ public:
     {
         Repeat(Milliseconds(timeMs));
     }
+
+    /**
+    * @name Repeat
+    * @brief Repeats the most recently executed event.
+    * @param minTime The minimum time until the event occurs as std::chrono type.
+    * @param maxTime The maximum time until the event occurs as std::chrono type.
+    */
+    void Repeat(Milliseconds minTime, Milliseconds maxTime);
 
     /**
      * @name RepeatEvent (Randomized Delay)
