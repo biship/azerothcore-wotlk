@@ -176,6 +176,29 @@ public:
     void Repeat(Milliseconds minTime, Milliseconds maxTime);
 
     /**
+    * @name RepeatEvent (Single Delay)
+    * @brief [DEPRECATED] Compatibility wrapper for the old RepeatEvent.
+    * @param timeMs Time in milliseconds until the event occurs.
+    */
+    [[deprecated("RepeatEvent is deprecated. Use Repeat(Milliseconds(time)) instead.")]]
+    void RepeatEvent(uint32_t timeMs)
+    {
+        Repeat(Milliseconds(timeMs));
+    }
+
+    /**
+     * @name RepeatEvent (Randomized Delay)
+     * @brief [DEPRECATED] Compatibility wrapper for the old RepeatEvent.
+     * @param minTimeMs The minimum time in milliseconds until the event occurs.
+     * @param maxTimeMs The maximum time in milliseconds until the event occurs.
+     */
+    [[deprecated("RepeatEvent is deprecated. Use Repeat(Milliseconds(minTime), Milliseconds(maxTime)) instead.")]]
+    void RepeatEvent(uint32_t minTimeMs, uint32_t maxTimeMs)
+    {
+        Repeat(Milliseconds(minTimeMs), Milliseconds(maxTimeMs));
+    }
+
+    /**
     * @name ExecuteEvent
     * @brief Returns the next event to execute and removes it from map.
     * @return Id of the event to execute.
