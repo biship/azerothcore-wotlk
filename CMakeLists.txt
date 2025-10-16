@@ -12,7 +12,7 @@
 
 # Require version Cmake
 #cmake_minimum_required(VERSION 3.16...3.22)
-cmake_minimum_required(VERSION 3.16...3.50)
+cmake_minimum_required(VERSION 3.16...3.49)
 
 # Modern Windows and C++/C standards
 set(CMAKE_SYSTEM_NAME Windows)
@@ -25,20 +25,16 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
 if (MSVC)
-  # Base warning & optimization flags
-  set(COMMON_FLAGS "/D_WIN32_WINNT=0x0A00 /EHsc /Ob2 /Oi")
-
-  # Apply per configuration
-  set(CMAKE_CXX_FLAGS_RELEASE "/O2 ${COMMON_FLAGS}" CACHE STRING "" FORCE)
-  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/O2 /Zi ${COMMON_FLAGS}" CACHE STRING "" FORCE)
-  set(CMAKE_CXX_FLAGS_DEBUG "/Od /Zi /EHsc" CACHE STRING "" FORCE)
-  set(CMAKE_CXX_FLAGS_MINSIZEREL "/O1 ${COMMON_FLAGS}" CACHE STRING "" FORCE)
-
-  # Apply to C as well (if any C files exist)
-  set(CMAKE_C_FLAGS_RELEASE "/O2 ${COMMON_FLAGS}" CACHE STRING "" FORCE)
-  set(CMAKE_C_FLAGS_RELWITHDEBINFO "/O2 /Zi ${COMMON_FLAGS}" CACHE STRING "" FORCE)
-  set(CMAKE_C_FLAGS_DEBUG "/Od /Zi /EHsc" CACHE STRING "" FORCE)
-  set(CMAKE_C_FLAGS_MINSIZEREL "/O1 ${COMMON_FLAGS}" CACHE STRING "" FORCE)
+  # Append project-specific flags to the existing flags for each configuration.
+  # The space at the beginning is important!
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /Ob2 /Oi" CACHE STRING "" FORCE)
+  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /O2 /Ob2 /Oi /Zi" CACHE STRING "" FORCE)
+  set(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} /O1" CACHE STRING "" FORCE)
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Od /Zi" CACHE STRING "" FORCE)
+  
+  # Set a default for LUA_VERSION, but DO NOT use FORCE.
+  # This allows the user to override it with -D...
+  set(LUA_VERSION "luajit" CACHE STRING "Lua engine selection" FORCE)
 endif()
 
 message(STATUS "CMake version: ${CMAKE_VERSION}")
