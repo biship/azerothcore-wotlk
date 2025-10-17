@@ -1543,8 +1543,8 @@ void WorldSession::InitializeSessionCallback(CharacterDatabaseQueryHolder const&
     SendClientCacheVersion(clientCacheVersion);
     SendTutorialsData();
 }
-
-LockedQueue<WorldPacket*>& WorldSession::GetPacketQueue()
+void WorldSession::SetPacketLogging(bool state)
 {
-    return _recvQueue;
+    if (m_Socket)
+        m_Socket->SetPacketLogging(state);
 }
