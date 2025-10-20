@@ -1548,3 +1548,8 @@ void WorldSession::SetPacketLogging(bool state)
     if (m_Socket)
         m_Socket->SetPacketLogging(state);
 }
+
+LockedQueue<WorldPacket*>& WorldSession::GetPacketQueue()
+{
+    return _recvQueue;
+}
