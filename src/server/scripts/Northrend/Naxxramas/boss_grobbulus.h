@@ -90,7 +90,7 @@ public:
             events.ScheduleEvent(EVENT_POISON_CLOUD, 15s);
             events.ScheduleEvent(EVENT_MUTATING_INJECTION, 20s);
             events.ScheduleEvent(EVENT_SLIME_SPRAY, 10s);
-            events.ScheduleEvent(EVENT_BERSERK, Milliseconds(RAID_MODE(720000, 540000)));
+            events.ScheduleEvent(EVENT_BERSERK, RAID_MODE(720s, 540s));
         }
 
         void SpellHitTarget(Unit* target, SpellInfo const* spellInfo) override

@@ -263,18 +263,20 @@ enum CharterTypes
     ARENA_TEAM_CHARTER_3v3_TYPE                   = 3,
     ARENA_TEAM_CHARTER_5v5_TYPE                   = 5
 };
+
 class LoginQueryHolder : public CharacterDatabaseQueryHolder
 {
     private:
         uint32 m_accountId;
         ObjectGuid m_guid;
+
     public:
         LoginQueryHolder(uint32 accountId, ObjectGuid guid);
+
         ObjectGuid GetGuid() const { return m_guid; }
         uint32 GetAccountId() const { return m_accountId; }
         bool Initialize();
 };
-
 
 //class to deal with packet processing
 //allows to determine if next packet is safe to be processed
@@ -1143,6 +1145,7 @@ public:                                                 // opcodes handlers
     bool IsKicked() const { return _kicked; }
     void SetKicked(bool val) { _kicked = val; }
     bool IsSocketClosed() const;
+
     void SetAddress(std::string const& address) { m_Address = address; }
 
     /*
@@ -1164,7 +1167,9 @@ public:                                                 // opcodes handlers
     {
         return _isBot;
     }
-
+=========
+    void SetPacketLogging(bool state);
+>>>>>>>>> Temporary merge branch 2
 
 private:
     void ProcessQueryCallbacks();
@@ -1275,9 +1280,10 @@ private:
     std::map<uint32, uint32> _pendingTimeSyncRequests; // key: counter. value: server time when packet with that counter was sent.
     uint32 _timeSyncNextCounter;
     uint32 _timeSyncTimer;
-    bool _isBot;
 
     uint32 _orderCounter;
+
+    bool _isBot;
 
     WorldSession(WorldSession const& right) = delete;
     WorldSession& operator=(WorldSession const& right) = delete;

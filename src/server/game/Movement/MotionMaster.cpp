@@ -929,6 +929,7 @@ void MotionMaster::MoveKnockbackFromForPlayer(float srcX, float srcY, float spee
     float moveTimeHalf = speedZ / Movement::gravity;
     float dist = 2 * moveTimeHalf * speedXY;
     float max_height = -Movement::computeFallElevation(moveTimeHalf, false, -speedZ);
+    // Use a mmap raycast to get a valid destination.
 
     _owner->MovePositionToFirstCollision(dest, dist, _owner->GetRelativeAngle(srcX, srcY) + float(M_PI));
 
@@ -937,8 +938,6 @@ void MotionMaster::MoveKnockbackFromForPlayer(float srcX, float srcY, float spee
     init.SetParabolic(max_height, 0);
     init.SetOrientationFixed(true);
     init.SetVelocity(speedXY);
-    init.Launch();
-
     Mutate(new EffectMovementGenerator(init, 0), MOTION_SLOT_CONTROLLED);
 }
 
