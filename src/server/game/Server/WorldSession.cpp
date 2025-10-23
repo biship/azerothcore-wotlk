@@ -15,9 +15,9 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** \file
-    \ingroup u2w
-*/
+ /** \file
+     \ingroup u2w
+ */
 
 #include "WorldSession.h"
 #include "AccountMgr.h"
@@ -373,17 +373,17 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
         WorldSession::DosProtection::Policy const evaluationPolicy = AntiDOS.EvaluateOpcode(*packet, currentTime);
         switch (evaluationPolicy)
         {
-            case WorldSession::DosProtection::Policy::Kick:
-            case WorldSession::DosProtection::Policy::Ban:
-                processedPackets = MAX_PROCESSED_PACKETS_IN_SAME_WORLDSESSION_UPDATE;
-                break;
-            case WorldSession::DosProtection::Policy::BlockingThrottle:
-                requeuePackets.push_back(packet);
-                deletePacket = false;
-                processedPackets = MAX_PROCESSED_PACKETS_IN_SAME_WORLDSESSION_UPDATE;
-                break;
-            default:
-                break;
+        case WorldSession::DosProtection::Policy::Kick:
+        case WorldSession::DosProtection::Policy::Ban:
+            processedPackets = MAX_PROCESSED_PACKETS_IN_SAME_WORLDSESSION_UPDATE;
+            break;
+        case WorldSession::DosProtection::Policy::BlockingThrottle:
+            requeuePackets.push_back(packet);
+            deletePacket = false;
+            processedPackets = MAX_PROCESSED_PACKETS_IN_SAME_WORLDSESSION_UPDATE;
+            break;
+        default:
+            break;
         }
 
         if (evaluationPolicy == WorldSession::DosProtection::Policy::Process
@@ -723,10 +723,10 @@ void WorldSession::LogoutPlayer(bool save)
         // there are some positive auras from boss encounters that can be kept by logging out and logging in after boss is dead, and may be used on next bosses
         _player->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_CHANGE_MAP);
 
-        if (Group *group = _player->GetGroupInvite())
+        if (Group* group = _player->GetGroupInvite())
             sWorld->getBoolConfig(CONFIG_LEAVE_GROUP_ON_LOGOUT)
-                ? _player->UninviteFromGroup()  // Can disband group.
-                : group->RemoveInvite(_player); // Just removes invite.
+            ? _player->UninviteFromGroup()  // Can disband group.
+            : group->RemoveInvite(_player); // Just removes invite.
 
         // remove player from the group if he is:
         // a) in group; b) not in raid group; c) logging out normally (not being kicked or disconnected) d) LeaveGroupOnLogout is enabled
@@ -768,7 +768,7 @@ void WorldSession::LogoutPlayer(bool save)
 
             if (_player->GetMap()->IsDungeon() || _player->GetMap()->IsRaidOrHeroicDungeon())
             {
-                Map::PlayerList const &playerList = _player->GetMap()->GetPlayers();
+                Map::PlayerList const& playerList = _player->GetMap()->GetPlayers();
                 if (playerList.IsEmpty())
                     _player->TeleportToEntryPoint();
             }
@@ -1415,46 +1415,47 @@ WorldSession::DosProtection::Policy WorldSession::DosProtection::EvaluateOpcode(
 
     switch (WorldSession::DosProtection::Policy(policy->Policy))
     {
-        case WorldSession::DosProtection::Policy::Kick:
+    case WorldSession::DosProtection::Policy::Kick:
+    {
+        LOG_INFO("network", "AntiDOS: Player {} kicked!", Session->GetPlayerName());
+        Session->KickPlayer();
+        break;
+    }
+    case WorldSession::DosProtection::Policy::Ban:
+    {
+        uint32 bm = sWorld->getIntConfig(CONFIG_PACKET_SPOOF_BANMODE);
+        uint32 duration = sWorld->getIntConfig(CONFIG_PACKET_SPOOF_BANDURATION); // in seconds
+        std::string nameOrIp = "";
+        switch (bm)
         {
-            LOG_INFO("network", "AntiDOS: Player {} kicked!", Session->GetPlayerName());
-            Session->KickPlayer();
+        case 0: // Ban account
+            (void)AccountMgr::GetName(Session->GetAccountId(), nameOrIp);
+            sBan->BanAccount(nameOrIp, std::to_string(duration), "DOS (Packet Flooding/Spoofing", "Server: AutoDOS");
+            break;
+        case 1: // Ban ip
+            nameOrIp = Session->GetRemoteAddress();
+            sBan->BanIP(nameOrIp, std::to_string(duration), "DOS (Packet Flooding/Spoofing", "Server: AutoDOS");
             break;
         }
-        case WorldSession::DosProtection::Policy::Ban:
-        {
-            uint32 bm = sWorld->getIntConfig(CONFIG_PACKET_SPOOF_BANMODE);
-            uint32 duration = sWorld->getIntConfig(CONFIG_PACKET_SPOOF_BANDURATION); // in seconds
-            std::string nameOrIp = "";
-            switch (bm)
-            {
-                case 0: // Ban account
-                    (void)AccountMgr::GetName(Session->GetAccountId(), nameOrIp);
-                    sBan->BanAccount(nameOrIp, std::to_string(duration), "DOS (Packet Flooding/Spoofing", "Server: AutoDOS");
-                    break;
-                case 1: // Ban ip
-                    nameOrIp = Session->GetRemoteAddress();
-                    sBan->BanIP(nameOrIp, std::to_string(duration), "DOS (Packet Flooding/Spoofing", "Server: AutoDOS");
-                    break;
-            }
 
-            LOG_INFO("network", "AntiDOS: Player automatically banned for {} seconds.", duration);
-            break;
-        }
-        case WorldSession::DosProtection::Policy::DropPacket:
-        {
-            LOG_INFO("network", "AntiDOS: Opcode packet {} from player {} will be dropped.", p.GetOpcode(), Session->GetPlayerName());
-            break;
-        }
-        default: // invalid policy
-            break;
+        LOG_INFO("network", "AntiDOS: Player automatically banned for {} seconds.", duration);
+        break;
+    }
+    case WorldSession::DosProtection::Policy::DropPacket:
+    {
+        LOG_INFO("network", "AntiDOS: Opcode packet {} from player {} will be dropped.", p.GetOpcode(), Session->GetPlayerName());
+        break;
+    }
+    default: // invalid policy
+        break;
     }
 
     return WorldSession::DosProtection::Policy(policy->Policy);
 }
 
 WorldSession::DosProtection::DosProtection(WorldSession* s) :
-    Session(s) { }
+    Session(s) {
+}
 
 void WorldSession::ResetTimeSync()
 {
@@ -1517,9 +1518,9 @@ void WorldSession::InitializeSession()
     }
 
     AddQueryHolderCallback(CharacterDatabase.DelayQueryHolder(realmHolder)).AfterComplete([this, cacheVersion](SQLQueryHolderBase const& holder)
-    {
-        InitializeSessionCallback(static_cast<AccountInfoQueryHolderPerRealm const&>(holder), cacheVersion);
-    });
+        {
+            InitializeSessionCallback(static_cast<AccountInfoQueryHolderPerRealm const&>(holder), cacheVersion);
+        });
 }
 
 void WorldSession::InitializeSessionCallback(CharacterDatabaseQueryHolder const& realmHolder, uint32 clientCacheVersion)
@@ -1544,11 +1545,6 @@ void WorldSession::InitializeSessionCallback(CharacterDatabaseQueryHolder const&
     SendTutorialsData();
 }
 
-<<<<<<<<< Temporary merge branch 1
-LockedQueue<WorldPacket*>& WorldSession::GetPacketQueue()
-{
-    return _recvQueue;
-=========
 void WorldSession::SetPacketLogging(bool state)
 {
     if (m_Socket)

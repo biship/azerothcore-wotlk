@@ -15,9 +15,9 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/// \addtogroup u2w
-/// @{
-/// \file
+ /// \addtogroup u2w
+ /// @{
+ /// \file
 
 #ifndef __WORLDSESSION_H
 #define __WORLDSESSION_H
@@ -202,14 +202,14 @@ namespace WorldPackets
 
 enum AccountDataType
 {
-    GLOBAL_CONFIG_CACHE             = 0,                    // 0x01 g
-    PER_CHARACTER_CONFIG_CACHE      = 1,                    // 0x02 p
-    GLOBAL_BINDINGS_CACHE           = 2,                    // 0x04 g
-    PER_CHARACTER_BINDINGS_CACHE    = 3,                    // 0x08 p
-    GLOBAL_MACROS_CACHE             = 4,                    // 0x10 g
-    PER_CHARACTER_MACROS_CACHE      = 5,                    // 0x20 p
-    PER_CHARACTER_LAYOUT_CACHE      = 6,                    // 0x40 p
-    PER_CHARACTER_CHAT_CACHE        = 7,                    // 0x80 p
+    GLOBAL_CONFIG_CACHE = 0,                    // 0x01 g
+    PER_CHARACTER_CONFIG_CACHE = 1,                    // 0x02 p
+    GLOBAL_BINDINGS_CACHE = 2,                    // 0x04 g
+    PER_CHARACTER_BINDINGS_CACHE = 3,                    // 0x08 p
+    GLOBAL_MACROS_CACHE = 4,                    // 0x10 g
+    PER_CHARACTER_MACROS_CACHE = 5,                    // 0x20 p
+    PER_CHARACTER_LAYOUT_CACHE = 6,                    // 0x40 p
+    PER_CHARACTER_CHAT_CACHE = 7,                    // 0x80 p
 };
 
 #define NUM_ACCOUNT_DATA_TYPES        8
@@ -219,9 +219,9 @@ enum AccountDataType
 
 struct AccountData
 {
-    AccountData() :  Data("") {}
+    AccountData() : Data("") {}
 
-    time_t Time{0};
+    time_t Time{ 0 };
     std::string Data;
 };
 
@@ -235,18 +235,18 @@ enum PartyOperation
 
 enum BFLeaveReason
 {
-    BF_LEAVE_REASON_CLOSE     = 0x00000001,
+    BF_LEAVE_REASON_CLOSE = 0x00000001,
     //BF_LEAVE_REASON_UNK1      = 0x00000002, (not used)
     //BF_LEAVE_REASON_UNK2      = 0x00000004, (not used)
-    BF_LEAVE_REASON_EXITED    = 0x00000008,
+    BF_LEAVE_REASON_EXITED = 0x00000008,
     BF_LEAVE_REASON_LOW_LEVEL = 0x00000010,
 };
 
 enum ChatRestrictionType
 {
     ERR_CHAT_RESTRICTED = 0,
-    ERR_CHAT_THROTTLED  = 1,
-    ERR_USER_SQUELCHED  = 2,
+    ERR_CHAT_THROTTLED = 1,
+    ERR_USER_SQUELCHED = 2,
     ERR_YELL_RESTRICTED = 3
 };
 
@@ -258,24 +258,24 @@ enum DeclinedNameResult
 
 enum CharterTypes
 {
-    GUILD_CHARTER_TYPE                            = 9,
-    ARENA_TEAM_CHARTER_2v2_TYPE                   = 2,
-    ARENA_TEAM_CHARTER_3v3_TYPE                   = 3,
-    ARENA_TEAM_CHARTER_5v5_TYPE                   = 5
+    GUILD_CHARTER_TYPE = 9,
+    ARENA_TEAM_CHARTER_2v2_TYPE = 2,
+    ARENA_TEAM_CHARTER_3v3_TYPE = 3,
+    ARENA_TEAM_CHARTER_5v5_TYPE = 5
 };
 
 class LoginQueryHolder : public CharacterDatabaseQueryHolder
 {
-    private:
-        uint32 m_accountId;
-        ObjectGuid m_guid;
+private:
+    uint32 m_accountId;
+    ObjectGuid m_guid;
 
-    public:
-        LoginQueryHolder(uint32 accountId, ObjectGuid guid);
+public:
+    LoginQueryHolder(uint32 accountId, ObjectGuid guid);
 
-        ObjectGuid GetGuid() const { return m_guid; }
-        uint32 GetAccountId() const { return m_accountId; }
-        bool Initialize();
+    ObjectGuid GetGuid() const { return m_guid; }
+    uint32 GetAccountId() const { return m_accountId; }
+    bool Initialize();
 };
 
 //class to deal with packet processing
@@ -325,7 +325,8 @@ class CharacterCreateInfo
 public:
     CharacterCreateInfo(std::string const name = "", uint8 _race = 0, uint8 _class = 0, uint8 gender = 0, uint8 skin = 0, uint8 face = 0,
         uint8 hairStyle = 0, uint8 hairColor = 0, uint8 facialHair = 0)
-        : Name(name), Race(_race), Class(_class), Gender(gender), Skin(skin), Face(face), HairStyle(hairStyle), HairColor(hairColor), FacialHair(facialHair) { }
+        : Name(name), Race(_race), Class(_class), Gender(gender), Skin(skin), Face(face), HairStyle(hairStyle), HairColor(hairColor), FacialHair(facialHair) {
+    }
 
 protected:
     /// User specified variables
@@ -954,7 +955,7 @@ public:                                                 // opcodes handlers
 
     void HandlePageTextQueryOpcode(WorldPacket& recvPacket);
 
-    void HandleTutorialFlag (WorldPacket& recvData);
+    void HandleTutorialFlag(WorldPacket& recvData);
     void HandleTutorialClear(WorldPacket& recvData);
     void HandleTutorialReset(WorldPacket& recvData);
 
@@ -1167,9 +1168,6 @@ public:                                                 // opcodes handlers
     {
         return _isBot;
     }
-=========
-    void SetPacketLogging(bool state);
->>>>>>>>> Temporary merge branch 2
 
 private:
     void ProcessQueryCallbacks();
