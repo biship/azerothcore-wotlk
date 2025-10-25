@@ -80,7 +80,8 @@ foreach(SOURCE_MODULE ${MODULES_MODULE_LIST})
   # Use only static for mod-ALE
   if (SOURCE_MODULE MATCHES "mod-ale")
     ConfigureALEModule(${SOURCE_MODULE})
- endif()
+  endif()
+
   if (SOURCE_MODULE MATCHES "mod-playerbots")
     set(MOD_PLAYERBOTS_FOUND 1)
     target_compile_options(database
@@ -368,6 +369,7 @@ target_compile_options(modules
 target_compile_options(modules
   INTERFACE
     -DCONFIG_FILE_LIST=$<1:"${CONFIG_LIST}">)
+
 if (MOD_PLAYERBOTS_FOUND)
   target_compile_options(modules
       PRIVATE
