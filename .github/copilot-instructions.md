@@ -1,184 +1,375 @@
-# 🧩 AzerothCore WotLK Server (Windows 11 Build Environment)
-
-AzerothCore is an open-source **World of Warcraft 3.3.5a** server emulator written in C++ with modular architecture.  
-These instructions apply to **Windows 11 x64**, **Visual Studio 2022 Preview**, **CMake 3.31+**, and **MySQL 8.4**.  
-
-Always follow the steps below — use PowerShell, not Bash. Only refer to upstream Linux instructions when this document and the actual repository diverge.
-
+---
+CoPilot instructions Source: https://copilot-instructions.md/
+Azerothcore coding standards Source: https://www.azerothcore.org/wiki/cpp-code-standards
 ---
 
-## ⚙️ Initial Setup
+/*
+================================================================================
+  You are an AI C++ systems developer for the AzerothCore project.
 
-### 1. Required Software
-Install these once:
-| Component | Version | Notes |
-|------------|----------|-------|
-| **Visual Studio 2022 Preview** | Latest | Include “Desktop Development with C++” workload |
-| **CMake** | ≥ 3.31 | `cmake --version` |
-| **MySQL Server 8.4.x** | 64-bit | Default instance, TCP 3306 |
-| **OpenSSL 3.x for Windows** | 64-bit | e.g., from [slproweb.com](https://slproweb.com/products/Win32OpenSSL.html) |
-| **Git for Windows** | Latest | Required for `git pull --recurse-submodules` |
-| **PowerShell 7+** | (Built-in on Win 11) | Required for scripts below |
+  You will:
+    • Write clear, maintainable, and modern C++ code that integrates seamlessly 
+      with the AzerothCore framework and compiles cleanly on all supported systems.
 
----
+    • Always target the latest toolchains and compilers:
+          - Visual Studio 18 (2026) or newer
+          - MSVC v146+, GCC 14+, Clang 18+
+          - CMake 3.31+ build system
 
-## 🏗️ Build Process
+    • Enforce modern language standards:
+          set(CMAKE_CXX_STANDARD 23)
+          set(CMAKE_C_STANDARD 17)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          set(CMAKE_CXX_EXTENSIONS OFF)
 
-### 1. Prepare Environment
-Open a **Developer PowerShell for VS 2022** and run:
+    • Use modern C++ features appropriately:
+          - Strong type safety, RAII, smart pointers
+          - std::optional, std::variant, std::filesystem, std::thread
+          - Ranged for-loops, constexpr, and concepts when suitable
+          - Use <format> and <chrono> over legacy APIs
 
-```powershell
-$vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-  -latest -prerelease -products * `
-  -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-  -property installationPath
-Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
-Enter-VsDevShell -VsInstallPath $vs -DevCmdArguments '-arch=x64'
+    • Follow these core principles:
+          - Favor readability and maintainability over cleverness
+          - Use structured bindings, not raw pointers or manual memory
+          - Avoid macros unless absolutely necessary
+          - Keep dependencies minimal and modular
+          - Ensure deterministic behavior across compilers and platforms
+
+    • Guarantee full compliance with the AzerothCore coding standards that follow:
+          - Consistent naming conventions
+          - Proper use of namespaces and includes
+          - Strict warning level compliance (treat warnings as errors)
+          - Inline documentation for all new or modified logic
+
+  After this comment block, the official AzerothCore GitHub Coding Standards 
+  are included to guide implementation.
+================================================================================
+*/
+
+# C++ Code Standards
+
+## Intro
+
+### Why are coding standards important?
+
+It makes it easier for everyone to maintain and read the written code as well as it gives us more control over it.
+
+It can also act as a safeguard to prevent errors in the code.
+
+### Why is it important for everyone to follow the standards?
+
+We only accept code that is written to the standards, this means that a PR you want to contribute with can be merged faster if you follow the standards from the beginning.
+
+## Coding Standards
+
+### Tabs and Indents
+
+We never use tabs, instead, we use spaces.
+
+One tab is equal to 4 spaces and that is what should be used throughout the whole project.
+
+Visual Studio:
+
+Tools -> Options -> Text Editor -> C/C++ -> Tabs -> Smart, 4, 4, Insert spaces.
+
+Notepad++:
+
+Settings -> Preferences -> Language -> Tab size: 4, Replace by space: checked
+
+### Comments
+
+Always comment on code where it is not typical repeated code and where the code is not self-explanatory.
+
+Avoid including hyperlinks in code comments, as they may become outdated or broken over time. If a link is relevant, include it in the pull request description instead—it can be referenced later via Git history.
+
+Comments should either be placed directly above the code, or directly beside it.
+
+```cpp
+// A Comment
+if (a == b)
+
+if (a == b)
+{
+    a = b; // A Comment
 ```
 
-### 2. Configure Build (CMake)
-```powershell
-j:
-cd "J:\Code\Games\wow\servers\liyunfan1223-azerothcore-wotlk\Build"
+### Whitespace
 
-cmake --fresh -S .. -B . -G "Visual Studio 17 2022" -A x64 `
-  -DTOOLS_BUILD=all `
-  -DLUA_VERSION=luajit `
-  -DCMAKE_CXX_FLAGS="/D_WIN32_WINNT=0x0A00 /EHsc" `
-  -DCMAKE_CXX_FLAGS_RELEASE="/O2 /Ob2 /Oi"
+Trailing whitespace is not allowed.
+
+You should also not have unneeded spaces within a bracket. 
+
+Wrong:
+
+```cpp
+if( var )
+if ( var )
 ```
 
-### 3. Build (MSBuild via CMake)
-```powershell
-cmake --build . --target ALL_BUILD --config RelWithDebInfo -- /m:16 /p:UseMultiToolTask=true
+Correct:
+
+```cpp
+if (var)
 ```
 
-### 4. Post-Build Copies (if missing)
-```powershell
-Copy-Item "C:\Program Files\MySQL\MySQL Server 8.4\lib\libmysql.dll" -Destination .\bin\RelWithDebInfo
-Copy-Item "C:\Program Files\OpenSSL-Win64\bin\libcrypto-3-x64.dll" -Destination .\bin\RelWithDebInfo
-Copy-Item "C:\Program Files\OpenSSL-Win64\bin\libssl-3-x64.dll" -Destination .\bin\RelWithDebInfo
+### Brackets
+
+Brackets should be refrained from using for if statements that are followed by one line.
+
+```cpp
+if (var)
+{
+    me->DoA();
+    me->DoB();
+}
+else
+    me->DoC();
 ```
 
-Binaries appear in:
-```
-Build\bin\RelWithDebInfo\
-  ├── authserver.exe
-  └── worldserver.exe
-```
+### Loop syntax
 
----
+```cpp
+for (uint32 i = 0; i < loopEnd; ++i)
+{
+    DoSomething();
+    DoSomethingElse();
+}
 
-## 🧩 Module Setup
+uint32 i = 0;
+while (i < 10)
+{
+    DoSomething();
+    DoSomethingElse();
+    ++i;
+}
 
-Modules are in `modules\<module>\src` with configuration in:
-```
-Build\bin\RelWithDebInfo\configs\modules\<module>.conf.dist
-```
-
-Rename and edit each file for activation:
-```
-copy mod-xyz.conf.dist mod-xyz.conf
-```
-
-> ⚠️ Do **not** delete the `.dist` files — AzerothCore loads both.
-
----
-
-## 🗄️ Database Initialization
-
-1. Start MySQL (Service “MYSQL80” or “MySQL”)
-2. Import base SQLs:
-   ```bash
-   mysql -u root -p < data/sql/base/auth_database.sql
-   mysql -u root -p < data/sql/base/characters_database.sql
-   mysql -u root -p < data/sql/base/world_database.sql
-   ```
-3. Import each module’s SQLs from  
-   `modules\<module>\data\sql\db-world\*.sql`
-4. Update connection info in:
-   ```
-   Build\bin\RelWithDebInfo\configs\worldserver.conf
-   Build\bin\RelWithDebInfo\configs\authserver.conf
-   ```
-
----
-
-## ▶️ Running the Server
-
-Run from the same folder as the binaries:
-```powershell
-.\authserver.exe
-.\worldserver.exe
+do
+{
+    DoSomething();
+    DoSomethingElse();
+    ++i;
+} while (i > 0);
 ```
 
-To reload Eluna Lua scripts without restart:
-```
-.reload eluna
-```
+**Please note that brackets should always start on a new line, as displayed in the example above.**
 
----
+### Random numbers vs. Constants
 
-## 🧠 Debugging Notes
+Constants make the code easier to read and understand, they also provide a safeguard and prevent numbers from being hard-coded.
 
-| Scenario | Build Type | Command or Setting |
-|-----------|-------------|--------------------|
-| Crash investigation | **Debug** | Run from Visual Studio → Local Windows Debugger |
-| Optimized build | **RelWithDebInfo** | Default recommended |
-| Enable LuaJIT | `-DLUA_VERSION=luajit` | Already configured |
-| Force Win 11 API level | `/D_WIN32_WINNT=0x0A00` | Applied globally |
-| Eluna script reload | `.reload eluna` | In worldserver console |
+Wrong:
 
----
-
-## 💾 MySQL & Threads (Worldserver.conf)
-
-Example safe thread configuration to prevent deadlocks:
-
-```ini
-LoginDatabase.WorkerThreads     = 1
-WorldDatabase.WorkerThreads     = 1
-CharacterDatabase.WorkerThreads = 1
-
-LoginDatabase.SynchThreads     = 2
-WorldDatabase.SynchThreads     = 2
-CharacterDatabase.SynchThreads = 2
+```cpp
+if (player->GetQuestStatus(10090) == 1)
+    me->RemoveFlag(58, 2);
 ```
 
----
+Correct:
 
-## 🧱 Directory Layout
-
-```
-J:\Code\Games\wow\servers\liyunfan1223-azerothcore-wotlk
-├── Build\                    # CMake build output
-│   ├── bin\RelWithDebInfo\  # Executables, configs, logs
-│   └── deps\                 # External single-header libs (nlohmann, httplib)
-├── modules\                  # Custom modules (Eluna, playerbots, etc.)
-├── deps\nlohmann\json.hpp   # JSON single-header
-├── data\sql\base\          # Core SQL schemas
-├── lua_scripts\              # Eluna Lua scripts
-└── CMakeLists.txt
+```cpp
+if (player->GetQuestStatus(QUEST_BEAT_UP) == QUEST_STATUS_INCOMPLETE)
+    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
 ```
 
----
+Constants are set with #defines, constexpr, or enum/enum class. If it does not exist - create one.
 
-## 🛠️ Troubleshooting
+### Switch statements
 
-| Symptom | Likely Cause | Fix |
-|----------|--------------|-----|
-| `json.hpp not found` | `deps/nlohmann/json.hpp` missing | Copy it manually |
-| Crash ~60 s after start | Debug vs. release mismatch | Rebuild with `/EHsc /O2 /Ob2 /Oi` |
-| Server exits silently | DB thread deadlock | Set WorkerThreads = 1 |
-| Eluna error on damage | Null attacker | Add null-checks in `OnDamage()` |
-| SQL missing | Module SQLs not imported | Import manually before first run |
+A default action should always be present in a switch statement, even if it is just a break.
 
----
+```cpp
+switch (spells)
+{
+    case SPELL_1:
+    case SPELL_2:
+    {
+        if (moreThanOneLine)
+            UseBrackets();
+        break;
+    }
+    case SPELL_3:
+        DoSomethinCool();
+        [[fallthrough]]
+    default:
+        break;
+}
+```
 
-## ✅ Best Practices
+### Enumerations vs. define
 
-- Always run CMake with `--fresh` when upgrading or switching modules  
-- Use **RelWithDebInfo** for normal runs (debug symbols + optimized)  
-- Keep MySQL ≤ 8.4 for compatibility (9.x untested)  
-- Reload Lua scripts dynamically instead of restarting the server  
-- Keep `deps\` single-headers (`nlohmann`, `httplib`, etc.) under version control  
+It is strongly advised to avoid using #define for constants. use either a const variable or an enum if multiple variables can be grouped together.
+
+Enums must have a name. Separate constant on different enums depending on their type.
+
+```cpp
+enum Spells
+{
+    SPELL_1 = 1111,
+    SPELL_2 = 2222,
+    SPELL_3 = 3333
+};
+
+constexpr uint32 SPELL_4 = 4444;
+```
+
+### Enum vs. Enum Class
+
+Enum classes are preferred to be used as they can cause fewer surprises that could lead to bugs as the enum will not implicitly convert to other types like integers or other enums.
+
+```cpp
+enum class Spell : uint32
+{
+    One   = 1111,
+    Two   = 2222,
+    Three = 3333
+}
+```
+
+### Standard prefixes for constants
+
+All constants that we store have a standardized prefix.
+
+| PREFIX | Comment  |
+| :----- | :------- |
+| SPELL_ | Spell ID |
+| NPC_   | [creature_template.entry](creature_template#entry) |
+| ITEM_  | [item_template.entry](item_template#entry) |
+| GO_    | [gameobject_template.entry](gameobject_template#entry) |
+| QUEST_ | [quest_template.id](quest_template#id) |
+| SAY_   | [creature_text.GroupID](creature_text#groupid) |
+| EMOTE_ | [creature_text.GroupID](creature_text#groupid) Different prefix from SAY_ to show that this is an emote. |
+| MODEL_ | Creature model, DisplayID |
+| XX_G   | Heroic mode prefix (goes after the other prefix) XX is the max man amount from mode. (OBSOLETE AS OF PATCH 3.2 WITH SpellDifficulty.dbc) |
+| RAID_XX | Raid mode prefix (goes before the other prefix) XX is the max man amount from mode. (OBSOLETE AS OF PATCH 3.2 WITH SpellDifficulty.dbc) |
+| EVENT_ | Event/Encounter identifier for instances |
+| DATA_  | Identifiers in instance used for GUIDs/data not being event/encounter |
+| ACHIEV_ | Achievement ID |
+
+Correct:
+
+```
+SPELL_ENRAGE
+SPELL_ENRAGE_H
+EVENT_ILLIDAN
+DATA_ILLIDAN
+ACHIEVE_MAKE_IT_COUNT
+```
+
+### Naming of variables and functions
+
+Never use HUNGARIAN NOTATION in variable names!
+
+for public/protected members or global variables:
+
+```cpp
+uint64 SomeGuid;
+uint32 ShadowBoltTimer;
+uint8 ShadowBoltCount;
+bool IsEnraged;
+float HeightData;
+```
+
+for private members:
+
+```cpp
+uint64 _someGuid;
+uint32 _mapEntry;
+uint8 _count;
+bool _isDead;
+float _heightData;
+```
+
+Methods are always UpperCamelCase and their parameters in lowerCamelCase
+
+```cpp
+void DoSomething(uint32 someNumber)
+{
+    uint32 someOtherNumber = 5;
+}
+```
+
+Always use 'f' after float values when declaring them to avoid compile warnings.
+
+```cpp
+float posX = 234.3456f;
+```
+
+### Array of Structs:
+
+```cpp
+Position const PosMobs[5] =
+{
+    {-724.12f, -176.64f, 430.03f, 2.543f},
+    {-766.70f, -225.03f, 430.50f, 1.710f},
+    {-729.54f, -186.26f, 430.12f, 1.902f},
+    {-756.01f, -219.23f, 430.50f, 2.369f},
+    {-798.01f, -227.24f, 429.84f ,1.446f},
+};
+```
+
+### WorldObjects
+
+We define WorldObjects in this way:
+
+```cpp
+GameObject* go;
+Creature* creature;
+Item* item;
+Player* player;
+Unit* unit;
+```
+
+We never use multiple declarations with pointers
+
+```cpp
+Something* obj1, *obj2;
+```
+
+The proper way to do this is
+
+```cpp
+Something* obj1;
+Something* obj2;
+```
+
+References are defined in a similar way (& must be stuck to the type)
+
+```cpp
+Creature& creature;
+```
+
+Never define "me" in a creature or object script!
+
+'me' is the pointer to the scripted creature or object.
+
+### Defining const variables
+
+const keyword should always go after the type name
+
+```cpp
+Player const* player; // player object is constant
+Unit* const unit; // pointer to the unit is constant
+SpellEntry const* const spell; // both spell and pointer to spell are constant
+```
+
+### Static variables
+
+static keyword always should be put as first
+
+```cpp
+static uint32 someVar = 5;
+static float const otherVar = 1.0f;
+```
+
+### Header Guards
+
+All Header files should contain header guards
+
+```cpp
+#ifndef MY_HEADER_H
+#define MY_HEADER_H
+
+// Header content here
+
+#endif // MY_HEADER_H
+```
