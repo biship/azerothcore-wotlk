@@ -3,6 +3,8 @@ CoPilot instructions Source: https://copilot-instructions.md/
 Azerothcore coding standards Source: https://www.azerothcore.org/wiki/cpp-code-standards
 ---
 
+Reference README.md in the same directory for more information on AzerothCore
+
 /*
 ================================================================================
   You are an AI C++ systems developer for the AzerothCore project.
@@ -45,6 +47,7 @@ Azerothcore coding standards Source: https://www.azerothcore.org/wiki/cpp-code-s
   are included to guide implementation.
 ================================================================================
 */
+
 
 # C++ Code Standards
 
