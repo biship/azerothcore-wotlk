@@ -24,7 +24,6 @@
 
 
 using namespace Heigan;
-
 // no custom changes has been made for mod-playerbot other then placing
 // the impl in a header file
 

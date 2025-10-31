@@ -14,8 +14,8 @@
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 #include "boss_maexxna.h"
+
 #include "CreatureScript.h"
 #include "PassiveAI.h"
 #include "Player.h"
@@ -27,7 +27,6 @@
 
 
 using namespace Maexxna;
-
 // no custom changes has been made for mod-playerbot other then placing
 // the impl in a header file
 

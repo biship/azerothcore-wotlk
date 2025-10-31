@@ -16,6 +16,7 @@
  */
 
 #include "boss_thaddius.h"
+
 #include "AreaTriggerScript.h"
 #include "CreatureScript.h"
 #include "Player.h"
@@ -26,7 +27,6 @@
 
 
 using namespace Thaddius;
-
 // no custom changes has been made for mod-playerbot other then placing
 // the impl in a header file
 

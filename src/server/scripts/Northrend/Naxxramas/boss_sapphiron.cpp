@@ -16,6 +16,7 @@
  */
 
 #include "boss_sapphiron.h"
+
 #include "CreatureScript.h"
 #include "Player.h"
 #include "ScriptedCreature.h"

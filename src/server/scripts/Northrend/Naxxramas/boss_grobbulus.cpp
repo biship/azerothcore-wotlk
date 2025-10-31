@@ -14,8 +14,8 @@
  * You should have received a copy of the GNU General Public License along
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 #include "boss_grobbulus.h"
+
 #include "CreatureScript.h"
 #include "PassiveAI.h"
 #include "ScriptedCreature.h"
@@ -37,4 +37,5 @@ void AddSC_boss_grobbulus()
     new boss_grobbulus_poison_cloud();
     RegisterSpellScript(spell_grobbulus_mutating_injection_aura);
     RegisterSpellScript(spell_grobbulus_poison);
+    RegisterSpellScript(spell_grobbulus_slime_spray);
 }
