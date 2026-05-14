@@ -221,6 +221,7 @@ enum PlayerHook
     PLAYERHOOK_ON_GET_REPUTATION_PRICE_DISCOUNT,
     PLAYERHOOK_ON_LEARN_TAXI_NODE,
     PLAYERHOOK_ON_BEFORE_GET_LEVEL_FOR_XP_GAIN,
+    PLAYERHOOK_ON_TARGET_CHANGED,
     PLAYERHOOK_END
 };
 
@@ -860,6 +861,8 @@ public:
      * @param level The level that should be used for XP gain calculations
      */
     virtual void OnPlayerBeforeGetLevelForXPGain(Player const* /*player*/, uint8& /*level*/) {}
+
+    virtual void OnPlayerTargetChanged(Player* /*player*/, Unit* /*oldTarget*/, Unit* /*newTarget*/) {}
 };
 
 #endif

@@ -536,7 +536,19 @@ void WorldSession::HandleSetSelectionOpcode(WorldPacket& recv_data)
     ObjectGuid guid;
     recv_data >> guid;
 
+    // Capture old target Unit* BEFORE the selection changes
+    Unit* pOldTarget = _player->GetSelectedUnit();
+
     _player->SetSelection(guid);
+
+    // Resolve new target (nullptr if deselecting)
+    Unit* pNewTarget = guid
+        ? ObjectAccessor::GetUnit(*_player, guid)
+        : nullptr;
+
+    // Only fire if the target actually changed
+    if (pOldTarget != pNewTarget)
+        sScriptMgr->OnPlayerTargetChanged(_player, pOldTarget, pNewTarget);
 
     // Change target of current autoshoot spell
     if (guid)
