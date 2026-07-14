@@ -4769,6 +4769,14 @@ MunchingBlizzlike.Enabled = 1
 Daze.Enabled = 1
 
 #
+#    TravelStats.Enabled
+#        Description: Track player distance traveled on foot, mounted, swimming, and flying.
+#                     Values are stored in the character database and exposed to ALE scripts.
+#        Default:     0 - (Disabled)
+
+TravelStats.Enabled = 0
+
+#
 #    InfiniteAmmo.Enabled
 #        Description: Enable or disable ammo consumption for ranged attacks and thrown weapons.
 #        Default:     0 - (Blizzlike)
@@ -4868,14 +4876,6 @@ Respawn.DynamicEscortNPC = 0
 #        Default:     0 - (Disabled, spawn groups control respawn mode)
 
 Respawn.ForceCompatibilityMode = 0
-
-#
-#    TravelStats.Enabled
-#        Description: Track player distance traveled on foot, mounted, swimming, and flying.
-#                     Values are stored in the character database and exposed to ALE scripts.
-#        Default:     0 - (Disabled)
-
-TravelStats.Enabled = 0
 
 #
 ###################################################################################################
