@@ -44,6 +44,7 @@
 #include "VMapMgr2.h"
 #include "Weather.h"
 #include "WeatherMgr.h"
+#include <cmath>
 
 #define MAP_INVALID_ZONE        0xFFFFFFFF
 
@@ -804,6 +805,42 @@ void Map::PlayerRelocation(Player* player, float x, float y, float z, float o)
             EnsureGridLoaded(new_cell);
 
         AddToGrid(player, new_cell);
+    }
+
+    if (sWorld->getBoolConfig(CONFIG_TRAVEL_STATS_ENABLED))
+    {
+        float dx = x - player->GetPositionX();
+        float dy = y - player->GetPositionY();
+        float distanceSquared = dx * dx + dy * dy;
+
+        if (distanceSquared > 0.0001f && distanceSquared < 10000.0f)
+        {
+            double distance = std::sqrt(distanceSquared);
+            if (distance >= 1.0 && distance <= 100.0)
+            {
+                uint64 yards = static_cast<uint64>(std::round(distance));
+                if (player->IsFlying())
+                {
+                    player->AddTravelStatFlying(yards);
+                    player->AddTravelStatSessionTotal(yards);
+                }
+                else if (player->IsMounted())
+                {
+                    player->AddTravelStatMounted(yards);
+                    player->AddTravelStatSessionTotal(yards);
+                }
+                else if (player->isSwimming())
+                {
+                    player->AddTravelStatSwimming(yards);
+                    player->AddTravelStatSessionTotal(yards);
+                }
+                else
+                {
+                    player->AddTravelStatWalked(yards);
+                    player->AddTravelStatSessionTotal(yards);
+                }
+            }
+        }
     }
 
     player->Relocate(x, y, z, o);

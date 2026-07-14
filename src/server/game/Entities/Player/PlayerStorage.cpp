@@ -5546,6 +5546,7 @@ bool Player::LoadFromDB(ObjectGuid playerGuid, CharacterDatabaseQueryHolder cons
     _LoadSeasonalQuestStatus(holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_SEASONAL_QUEST_STATUS));
     _LoadMonthlyQuestStatus(holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_MONTHLY_QUEST_STATUS));
     _LoadRandomBGStatus(holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_RANDOM_BG));
+    _LoadMovementTravelStats(holder.GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_MOVEMENT_TRAVEL_STATS));
 
     // Extra Bonus Talent Points
     m_extraBonusTalentCount = fields[73].Get<uint8>();
@@ -7238,6 +7239,7 @@ void Player::SaveToDB(CharacterDatabaseTransaction trans, bool create, bool logo
     _SaveGlyphs(trans);
     _SaveInstanceTimeRestrictions(trans);
     _SavePlayerSettings(trans);
+    _SaveMovementTravelStats(create, trans);
 
     // check if stats should only be saved on logout
     // save stats can be out of transaction

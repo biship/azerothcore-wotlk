@@ -42,6 +42,7 @@
 #include "Unit.h"
 #include "WorldSession.h"
 #include <set>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -67,6 +68,15 @@ class UpdateMask;
 
 typedef std::deque<Mail*> PlayerMails;
 typedef void(*bgZoneRef)(Battleground*, WorldPackets::WorldState::InitWorldStates&);
+
+struct PlayerTravelStats
+{
+    uint64 SessionTotal = 0;
+    uint64 Walked = 0;
+    uint64 Mounted = 0;
+    uint64 Swimming = 0;
+    uint64 Flying = 0;
+};
 
 #define PLAYER_MAX_SKILLS           127
 #define PLAYER_MAX_DAILY_QUESTS     25
@@ -888,6 +898,7 @@ enum PlayerLoginQueryIndex
     PLAYER_LOGIN_QUERY_LOAD_CHARACTER_SETTINGS           = 36,
     PLAYER_LOGIN_QUERY_LOAD_PET_SLOTS                    = 37,
     PLAYER_LOGIN_QUERY_LOAD_OFFLINE_ACHIEVEMENTS_UPDATES = 38,
+    PLAYER_LOGIN_QUERY_LOAD_MOVEMENT_TRAVEL_STATS        = 39,
     MAX_PLAYER_LOGIN_QUERY
 };
 
@@ -2418,6 +2429,26 @@ public:
     float m_homebindY;
     float m_homebindZ;
 
+    PlayerTravelStats m_movementTravelStats;
+
+    [[nodiscard]] uint64 GetTravelStatSessionTotal() const { return m_movementTravelStats.SessionTotal; }
+    [[nodiscard]] uint64 GetTravelStatWalked() const { return m_movementTravelStats.Walked; }
+    [[nodiscard]] uint64 GetTravelStatMounted() const { return m_movementTravelStats.Mounted; }
+    [[nodiscard]] uint64 GetTravelStatSwimming() const { return m_movementTravelStats.Swimming; }
+    [[nodiscard]] uint64 GetTravelStatFlying() const { return m_movementTravelStats.Flying; }
+
+    void AddTravelStatSessionTotal(uint64 amount) { AddTravelStat(m_movementTravelStats.SessionTotal, amount); }
+    void AddTravelStatWalked(uint64 amount) { AddTravelStat(m_movementTravelStats.Walked, amount); }
+    void AddTravelStatMounted(uint64 amount) { AddTravelStat(m_movementTravelStats.Mounted, amount); }
+    void AddTravelStatSwimming(uint64 amount) { AddTravelStat(m_movementTravelStats.Swimming, amount); }
+    void AddTravelStatFlying(uint64 amount) { AddTravelStat(m_movementTravelStats.Flying, amount); }
+
+    void RemoveTravelStatSessionTotal(uint64 amount) { m_movementTravelStats.SessionTotal = amount >= m_movementTravelStats.SessionTotal ? 0 : m_movementTravelStats.SessionTotal - amount; }
+    void RemoveTravelStatWalked(uint64 amount) { m_movementTravelStats.Walked = amount >= m_movementTravelStats.Walked ? 0 : m_movementTravelStats.Walked - amount; }
+    void RemoveTravelStatMounted(uint64 amount) { m_movementTravelStats.Mounted = amount >= m_movementTravelStats.Mounted ? 0 : m_movementTravelStats.Mounted - amount; }
+    void RemoveTravelStatSwimming(uint64 amount) { m_movementTravelStats.Swimming = amount >= m_movementTravelStats.Swimming ? 0 : m_movementTravelStats.Swimming - amount; }
+    void RemoveTravelStatFlying(uint64 amount) { m_movementTravelStats.Flying = amount >= m_movementTravelStats.Flying ? 0 : m_movementTravelStats.Flying - amount; }
+
     [[nodiscard]] WorldLocation GetStartPosition() const;
 
     [[nodiscard]] WorldLocation const& GetEntryPoint() const { return m_entryPointData.joinPos; }
@@ -2595,6 +2626,11 @@ public:
     [[nodiscard]] bool CanSeeTrainer(Creature const* creature) const;
 
 private:
+    static void AddTravelStat(uint64& stat, uint64 amount)
+    {
+        stat = amount > std::numeric_limits<uint64>::max() - stat ? std::numeric_limits<uint64>::max() : stat + amount;
+    }
+
     [[nodiscard]] bool AnyVendorOptionAvailable(uint32 menuId, Creature const* creature) const;
 public:
     [[nodiscard]] uint32 GetChampioningFaction() const { return m_ChampioningFaction; }
@@ -2791,6 +2827,7 @@ protected:
     void _LoadBrewOfTheMonth(PreparedQueryResult result);
     void _LoadCharacterSettings(PreparedQueryResult result);
     void _LoadPetStable(uint8 petStableSlots, PreparedQueryResult result);
+    void _LoadMovementTravelStats(PreparedQueryResult result);
 
     /*********************************************************/
     /***                   SAVE SYSTEM                     ***/
@@ -2814,6 +2851,7 @@ protected:
     void _SaveCharacter(bool create, CharacterDatabaseTransaction trans);
     void _SaveInstanceTimeRestrictions(CharacterDatabaseTransaction trans);
     void _SavePlayerSettings(CharacterDatabaseTransaction trans);
+    void _SaveMovementTravelStats(bool create, CharacterDatabaseTransaction trans);
 
     /*********************************************************/
     /***              ENVIRONMENTAL SYSTEM                 ***/

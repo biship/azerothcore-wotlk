@@ -4870,6 +4870,14 @@ Respawn.DynamicEscortNPC = 0
 Respawn.ForceCompatibilityMode = 0
 
 #
+#    TravelStats.Enabled
+#        Description: Track player distance traveled on foot, mounted, swimming, and flying.
+#                     Values are stored in the character database and exposed to ALE scripts.
+#        Default:     0 - (Disabled)
+
+TravelStats.Enabled = 0
+
+#
 ###################################################################################################
 
 ###################################################################################################

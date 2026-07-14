@@ -20,6 +20,8 @@
 
 void WorldConfig::BuildConfigCache()
 {
+    SetConfigValue<bool>(CONFIG_TRAVEL_STATS_ENABLED, "TravelStats.Enabled", false);
+
     SetConfigValue<bool>(CONFIG_ALLOW_TICKETS, "AllowTickets", true);
     SetConfigValue<bool>(CONFIG_DELETE_CHARACTER_TICKET_TRACE, "DeletedCharacterTicketTrace", false);
 

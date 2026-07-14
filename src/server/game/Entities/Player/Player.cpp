@@ -4226,6 +4226,10 @@ void Player::DeleteFromDB(ObjectGuid::LowType lowGuid, uint32 accountId, bool up
                 stmt->SetData(0, lowGuid);
                 trans->Append(stmt);
 
+                stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_MOVEMENT_STAT);
+                stmt->SetData(0, lowGuid);
+                trans->Append(stmt);
+
                 Corpse::DeleteFromDB(playerGuid, trans);
 
                 sScriptMgr->OnPlayerDeleteFromDB(trans, lowGuid);
@@ -14928,6 +14932,33 @@ void Player::SetMap(Map* map)
 {
     Unit::SetMap(map);
     m_mapRef.link(map, this);
+}
+
+void Player::_SaveMovementTravelStats(bool /*create*/, CharacterDatabaseTransaction trans)
+{
+    CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_MOVEMENT_STAT);
+    stmt->SetData(0, GetGUID().GetCounter());
+    trans->Append(stmt);
+
+    stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_MOVEMENT_STAT);
+    stmt->SetData(0, GetGUID().GetCounter());
+    stmt->SetData(1, m_movementTravelStats.Walked);
+    stmt->SetData(2, m_movementTravelStats.Mounted);
+    stmt->SetData(3, m_movementTravelStats.Swimming);
+    stmt->SetData(4, m_movementTravelStats.Flying);
+    trans->Append(stmt);
+}
+
+void Player::_LoadMovementTravelStats(PreparedQueryResult result)
+{
+    if (!result)
+        return;
+
+    Field* fields = result->Fetch();
+    m_movementTravelStats.Walked = fields[0].Get<uint64>();
+    m_movementTravelStats.Mounted = fields[1].Get<uint64>();
+    m_movementTravelStats.Swimming = fields[2].Get<uint64>();
+    m_movementTravelStats.Flying = fields[3].Get<uint64>();
 }
 
 void Player::_SaveCharacter(bool create, CharacterDatabaseTransaction trans)
