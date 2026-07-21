@@ -1321,7 +1321,7 @@ void Guild::HandleSetInfo(WorldSession* session, std::string_view info)
     }
 }
 
-void Guild::HandleSetEmblem(WorldSession* session, EmblemInfo const& emblemInfo)
+void Guild::HandleSetEmblem(WorldSession* session, const EmblemInfo& emblemInfo)
 {
     Player* player = session->GetPlayer();
     if (!_IsLeader(player))
