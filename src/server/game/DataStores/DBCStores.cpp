@@ -215,7 +215,7 @@ typedef std::list<std::string> StoreProblemList;
 
 uint32 DBCFileCount = 0;
 
-static bool LoadDBC_assert_print(uint32 fsize, uint32 rsize, const std::string& filename)
+static bool LoadDBC_assert_print(uint32 fsize, uint32 rsize, const std::string const& filename)
 {
     LOG_ERROR("dbc", "Size of '{}' set by format string ({}) not equal size of C++ structure ({}).", filename, fsize, rsize);
 
@@ -272,7 +272,7 @@ inline void LoadDBC(uint32& availableDbcLocales, StoreProblemList& errors, DBCSt
     }
 }
 
-void LoadDBCStores(const std::string& dataPath)
+void LoadDBCStores(const std::string const& dataPath)
 {
     uint32 oldMSTime = getMSTime();
 
