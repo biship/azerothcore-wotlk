@@ -1,0 +1,35 @@
+[
+  {
+    "PRs": [
+      26661
+    ],
+    "Path": "ac",
+    "Remote": "azerothcore"
+  },
+  {
+    "PRs": [],
+    "Path": "ac",
+    "Remote": "pbazerothcore"
+  },
+  {
+    "PRs": [
+      2496,
+      2558,
+      2559,
+      2578,
+      2579,
+      2583,
+      2586,
+      2587,
+      2588,
+      2589
+    ],
+    "Path": "mod-playerbots",
+    "Remote": "upstream"
+  },
+  {
+    "PRs": [],
+    "Path": "mod-individual-progression",
+    "Remote": "origin"
+  }
+]
