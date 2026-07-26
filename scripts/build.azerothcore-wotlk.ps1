@@ -172,7 +172,8 @@ function Merge-PR {
         # Check if already up to date
         if ($mergeOutput -match "Already up to date" -or $mergeOutput -match "Already up-to-date") {
             Write-Host "✅ PR #$pr_num is already fully merged (already up to date)." -ForegroundColor Green
-            Write-Host "Skipping commit and push."
+            Write-Host "Skipping commit and push and removing PR from .json."
+			Remove-PrFromJson -pr_num $pr_num -remote $remote
             Write-Host "------------------------------------------------`n"
             return
         }
