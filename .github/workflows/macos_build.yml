@@ -30,7 +30,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout AzerothCore
+        uses: actions/checkout@v7
+
+      - name: Checkout Playerbot Module
+        uses: actions/checkout@v7
+        with:
+          repository: mod-playerbots/mod-playerbots
+          ref: ${{ github.ref_name == 'Playerbot' && 'master' || 'test-staging' }}
+          path: modules/mod-playerbots
+
       - name: Cache
         uses: actions/cache@v6
         with:

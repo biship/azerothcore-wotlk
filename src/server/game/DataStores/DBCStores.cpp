@@ -967,7 +967,7 @@ EmotesTextSoundEntry const* FindTextSoundEmoteFor(uint32 emote, uint32 race, uin
     return itr != sEmotesTextSoundMap.end() ? itr->second : nullptr;
 }
 
-const std::vector<SkillLineAbilityEntry const*>& GetSkillLineAbilitiesBySkillLine(uint32 skillLine)
+std::vector<SkillLineAbilityEntry const*> const& GetSkillLineAbilitiesBySkillLine(uint32 skillLine)
 {
     auto it = sSkillLineAbilityIndexBySkillLine.find(skillLine);
     if (it == sSkillLineAbilityIndexBySkillLine.end())
