@@ -122,3 +122,4 @@ __pycache__/
 # ==================
 .cache
 compile_commands.json
+scripts/
