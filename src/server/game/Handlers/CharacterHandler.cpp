@@ -215,7 +215,7 @@ bool LoginQueryHolder::Initialize()
     res &= SetPreparedQuery(PLAYER_LOGIN_QUERY_LOAD_OFFLINE_ACHIEVEMENTS_UPDATES, stmt);
 
     stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_MOVEMENT_STAT);
-    stmt->SetData(0, lowGuid);
+    stmt->SetData(0, rawGUID);
     res &= SetPreparedQuery(PLAYER_LOGIN_QUERY_LOAD_MOVEMENT_TRAVEL_STATS, stmt);
 
     return res;
