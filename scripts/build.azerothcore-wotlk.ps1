@@ -617,6 +617,86 @@ if ($updatemodules) {
 			git add -A && git commit -m "Upstream merge." && git push
 			Write-Host "My fork of module mod-playerbot is now current." -ForegroundColor Green
 			}
+		elseif ($mymodulerepo -and $_.Name -eq "mod-ale") {
+			# ==============================
+			# Update my fork of mod-ale
+			# ==============================
+			Write-Host "Updating my fork of module mod-ale..." -ForegroundColor Green
+			Set-Location "${basepath}\modules\mod-ale"
+
+			$currentBranch = (git branch --show-current).Trim()
+			if ($currentBranch -ne "master") {
+				Write-Host "❌ mod-ale must be on master; currently on '$currentBranch'." -ForegroundColor Red
+				exit 1
+			}
+
+			# Commit any existing local changes without failing when there are none.
+			git add -A
+			git diff --cached --quiet
+			if ($LASTEXITCODE -ne 0) {
+				git commit -m "Local changes before upstream merge."
+				if ($LASTEXITCODE -ne 0) {
+					Write-Host "❌ Could not commit existing mod-ale changes." -ForegroundColor Red
+					exit 1
+				}
+			}
+
+			git fetch --all --prune
+			if ($LASTEXITCODE -ne 0) {
+				Write-Host "❌ Failed to fetch mod-ale remotes." -ForegroundColor Red
+				exit 1
+			}
+
+			# Incorporate any changes previously pushed to my fork.
+			git merge --ff-only origin/master
+			if ($LASTEXITCODE -ne 0) {
+				Write-Host "❌ Local master and origin/master have diverged. Halting." -ForegroundColor Red
+				exit 1
+			}
+
+			# Merge AzerothCore first, then Aldori's additional changes.
+			foreach ($sourceBranch in @("official/master", "aldori/master")) {
+				Write-Host "My differences from ${sourceBranch}:" -ForegroundColor Green
+				git diff $sourceBranch --stat
+
+				Write-Host "Merging ${sourceBranch}..." -ForegroundColor Green
+				git merge --no-edit --no-ff $sourceBranch
+
+				if ($LASTEXITCODE -ne 0) {
+					git mergetool
+					if ($LASTEXITCODE -ne 0) {
+						Write-Host "❌ Mergetool failed or was aborted for ${sourceBranch}. Halting." -ForegroundColor Red
+						exit 1
+					}
+
+					$conflictFiles = git diff --name-only --diff-filter=U
+					if ($conflictFiles) {
+						Write-Host "❌ Unresolved conflicts remain after merging ${sourceBranch}:" -ForegroundColor Red
+						$conflictFiles | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+						exit 1
+					}
+
+					git add -A
+					git commit --no-edit
+					if ($LASTEXITCODE -ne 0) {
+						Write-Host "❌ Could not complete merge of ${sourceBranch}." -ForegroundColor Red
+						exit 1
+					}
+				}
+			}
+
+			if ($merge_prs) {
+				check_dir_then_merge
+			}
+
+			git push origin master
+			if ($LASTEXITCODE -ne 0) {
+				Write-Host "❌ Failed to push mod-ale to origin/master." -ForegroundColor Red
+				exit 1
+			}
+
+			Write-Host "✅ My fork of module mod-ale is now current." -ForegroundColor Green
+		}
 		else {
 			# Continue with existing error handling (applies to all paths)
 			Write-Host "Updating module: $($_.Name)" -ForegroundColor Green
