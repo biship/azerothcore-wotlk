@@ -1,22 +1,33 @@
 [
   {
     "Path": "ac",
-    "PRs": [26661],
-    "Remote": "azerothcore"
+    "Remote": "azerothcore",
+    "PRs": [
+      26661
+    ]
   },
   {
     "Path": "ac",
-    "PRs": [],
-    "Remote": "pbazerothcore"
+    "Remote": "pbazerothcore",
+    "PRs": []
   },
   {
     "Path": "mod-playerbots",
-    "PRs": [2496,2558,2559,2578,2579,2583,2586,2587,2588,2589],
-    "Remote": "upstream"
+    "Remote": "upstream",
+    "PRs": [
+      2496,
+      2558,
+      2559,
+      2578,
+      2586,
+      2587,
+      2588,
+      2589
+    ]
   },
   {
     "Path": "mod-individual-progression",
-    "PRs": [],
-    "Remote": "origin"
+    "Remote": "origin",
+    "PRs": []
   }
 ]

@@ -113,8 +113,8 @@ function Merge-PR {
         
         if ($pr_status -eq "MERGED") {
             Write-Host "✅ PR #$pr_num is already MERGED into remote." -ForegroundColor DarkYellow
-            $removeChoice = Read-Host "Remove PR #$pr_num from JSON list? (y/n)"
-            if ($removeChoice -eq 'y') {
+            $removeChoice = Read-Host "Remove PR #$pr_num from JSON list? (Y/n)"
+            if ([string]::IsNullOrWhiteSpace($removeChoice) -or $removeChoice -match '^[Yy]$') {
                 Remove-PrFromJson -pr_num $pr_num -remote $remote
             }
             Write-Host "------------------------------------------------`n"
