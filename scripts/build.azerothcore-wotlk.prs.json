@@ -1,7 +1,8 @@
 [
   {
     "PRs": [
-      26661
+      26661,
+      26982
     ],
     "Remote": "azerothcore",
     "Path": "ac"
