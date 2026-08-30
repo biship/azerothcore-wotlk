@@ -1,0 +1,37 @@
+{
+  "SchemaVersion": 1,
+  "Locations": [
+    {
+      "Name": "ac",
+      "Path": "J:\\Code\\ac",
+      "Scan": "self",
+      "Fetch": true,
+      "Merge": true,
+      "MergePRs": true
+    },
+    {
+      "Name": "modules",
+      "Path": "J:\\Code\\ac\\modules",
+      "Scan": "children",
+      "Fetch": true,
+      "Merge": true,
+      "MergePRs": true
+    },
+    {
+      "Name": "eluna",
+      "Path": "J:\\Code\\Games\\wow\\eluna",
+      "Scan": "children",
+      "Fetch": false,
+      "Merge": false,
+      "MergePRs": false
+    },
+    {
+      "Name": "tools",
+      "Path": "J:\\Code\\Games\\wow\\tools",
+      "Scan": "children",
+      "Fetch": false,
+      "Merge": false,
+      "MergePRs": false
+    }
+  ]
+}

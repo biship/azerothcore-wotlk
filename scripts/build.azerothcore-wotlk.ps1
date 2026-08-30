@@ -2,18 +2,17 @@
 #https://github.com/liyunfan1223/azerothcore-wotlk
 #git config --global pager.diff false && git config --global pager.log false && git config --global pager.show false
 $debug = $false
-$myrepo = $true
-$mymodulerepo = $true
-$updatecore = $true
-$updatemodules = $true
-$merge_prs = $true
+$locationsJsonPath = Join-Path $PSScriptRoot "build.azerothcore-wotlk.locations.json"
 $prsJsonPath = Join-Path $PSScriptRoot "build.azerothcore-wotlk.prs.json"
+$locationsConfig = $null
+$prsConfig = $null
+$prsConfigChanged = $false
 $all_prs = @()
 $all_prsByPath = @{}
-$updateeluna = $false
-$updatetools = $false
+$repositoryConfigByPath = @{}
 $release = "RelWithDebInfo"
-# Debug, Release, MinSizeRel (minimized size, less common), RelWithDebInfo (release build + debug symbols, what TrinityCore/AzerothCore recommend) 
+# Debug, Release, MinSizeRel (minimized size), or RelWithDebInfo.
+# RelWithDebInfo is the release build with debug symbols recommended by TrinityCore and AzerothCore.
 $clean = $false
 $partialclean = $false
 $build = $true
@@ -31,7 +30,8 @@ $mysqlexe = "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe"
 Set-Location "${basepath}"
 
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-$vs = & $vswhere -latest -prerelease -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1
+$vs = & $vswhere -latest -prerelease -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+    -property installationPath | Select-Object -First 1
 if (-not $vs) {
     Write-Host "❌ Error: Visual Studio installation with C++ tools not found." -ForegroundColor Red
     exit 1
@@ -54,7 +54,9 @@ Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-ar
 function Merge-PR {
     param (
         [int]$pr_num,
-        [string]$remote = "azerothcore"
+        [string]$remote,
+        [string]$branch,
+        [string]$location
     )
 
     Process {
@@ -62,19 +64,20 @@ function Merge-PR {
         Write-Host "Processing PR #$pr_num..." -ForegroundColor Cyan
 
         # --- 1. Check PR Status via GitHub API ---
-        
-        # Use the provided remote (azerothcore, bots, upstream, etc.)
-        $repoPath = ""
-        try {
-            # Get the URL from the git remote (e.g., "https://github.com/azerothcore/azerothcore-wotlk.git")
-            $remoteUrl = git remote get-url $remote
-            # Extract "azerothcore/azerothcore-wotlk" from the URL
-            $repoPath = $remoteUrl -replace ".*github.com[:/](.*?)(\.git)?$", '$1'
-        } catch {
-            Write-Host "❌ Could not get remote URL for '$remote'. Cannot check PR status." -ForegroundColor Red
-            Write-Host "Please ensure the remote '$remote' is configured correctly." -ForegroundColor Gray
-            exit 1
+
+        $remoteUrlOutput = @(git remote get-url $remote 2>$null)
+        if ($LASTEXITCODE -ne 0 -or $remoteUrlOutput.Count -eq 0) {
+            throw "Could not get the URL for remote '$remote'."
         }
+        $remoteUrl = $remoteUrlOutput | Select-Object -First 1
+        $urlMatch = [regex]::Match(
+            $remoteUrl,
+            '(?i)github\.com[:/](?<owner>[^/]+)/(?<repository>[^/]+?)(?:\.git)?/?$'
+        )
+        if (-not $urlMatch.Success) {
+            throw "Remote '$remote' is not a supported GitHub URL: $remoteUrl"
+        }
+        $repoPath = "$($urlMatch.Groups['owner'].Value)/$($urlMatch.Groups['repository'].Value)"
 
         $apiUrl = "https://api.github.com/repos/$repoPath/pulls/$pr_num"
         $pr_status = ""
@@ -83,7 +86,7 @@ function Merge-PR {
             Write-Host "Checking status of PR #$pr_num from $apiUrl..." -ForegroundColor Gray
             # Call the GitHub API
             $pr_data = Invoke-RestMethod -Uri $apiUrl -ErrorAction Stop
-            
+
             if ($null -ne $pr_data.merged_at) {
                 # PR is merged
                 $pr_status = "MERGED"
@@ -110,12 +113,12 @@ function Merge-PR {
         }
 
         # --- 2. Handle based on Status ---
-        
+
         if ($pr_status -eq "MERGED") {
             Write-Host "✅ PR #$pr_num is already MERGED into remote." -ForegroundColor DarkYellow
             $removeChoice = Read-Host "Remove PR #$pr_num from JSON list? (y/n)"
             if ($removeChoice -eq 'y') {
-                Remove-PrFromJson -pr_num $pr_num -remote $remote
+                Remove-PrFromJson -pr_num $pr_num -remote $remote -branch $branch -location $location
             }
             Write-Host "------------------------------------------------`n"
             return # Skip to the next PR
@@ -125,22 +128,32 @@ function Merge-PR {
             Write-Host "❓ PR #$pr_num is CLOSED." -ForegroundColor Yellow
             $choice = Read-Host "Do you want to merge it (y) or unmerge (and del from json) it (n)?"
             if ($choice -eq 'n') {
-				Write-Host "Looking for previous merge commit for PR #$pr_num..." -ForegroundColor Cyan
-				$commit_hash = git log --grep="PR #$pr_num" --merges --format="%H" -n 1
-				if ($commit_hash) {
-					Write-Host "Found merge commit: $commit_hash" -ForegroundColor Gray
-					Write-Host "Reverting merge commit..." -ForegroundColor Yellow
-					git revert -m 1 $commit_hash --no-edit
-					if ($LASTEXITCODE -eq 0) {
-						Write-Host "✅ Successfully reverted PR #$pr_num." -ForegroundColor Green
-						Remove-PrFromJson -pr_num $pr_num -remote $remote
-						git push
-					} else {
-						Write-Host "❌ Failed to revert PR #$pr_num." -ForegroundColor Red
-					}
-				} else {
-					Write-Host "⚠️ No merge commit found for PR #$pr_num." -ForegroundColor Yellow
-				}
+                Write-Host "Looking for previous merge commit for PR #$pr_num..." -ForegroundColor Cyan
+                $commit_hash = git log --grep="PR #$pr_num" --merges --format="%H" -n 1
+                if ($commit_hash) {
+                    Write-Host "Found merge commit: $commit_hash" -ForegroundColor Gray
+                    Write-Host "Reverting merge commit..." -ForegroundColor Yellow
+                    git revert -m 1 $commit_hash --no-edit
+                    if ($LASTEXITCODE -ne 0) {
+                        $conflictFiles = @(git diff --name-only --diff-filter=U)
+                        if ($conflictFiles.Count -eq 0) {
+                            throw "Failed to revert PR #$pr_num without resolvable file conflicts."
+                        }
+                        Resolve-GitConflicts -Context "reverting PR #$pr_num"
+                        git add -A
+                        if ($LASTEXITCODE -ne 0) {
+                            throw "Failed to stage the resolved revert for PR #$pr_num."
+                        }
+                        git revert --continue
+                        if ($LASTEXITCODE -ne 0) {
+                            throw "Failed to continue the resolved revert for PR #$pr_num."
+                        }
+                    }
+                    Write-Host "✅ Successfully reverted PR #$pr_num." -ForegroundColor Green
+                    Remove-PrFromJson -pr_num $pr_num -remote $remote -branch $branch -location $location
+                } else {
+                    Write-Host "⚠️ No merge commit found for PR #$pr_num." -ForegroundColor Yellow
+                }
                 Write-Host "------------------------------------------------`n"
                 return # Skip to the next PR
             }
@@ -148,9 +161,9 @@ function Merge-PR {
         }
 
         # --- 3. Proceed with Merge (if OPEN or user-confirmed CLOSED) ---
-        
+
         Write-Host "Merging PR #$pr_num for testing..." -ForegroundColor Green
-        
+
         # Pull latest changes from the current branch first
         #git pull
 
@@ -158,16 +171,15 @@ function Merge-PR {
 
         # Fetch the latest PR head
         Write-Host "Fetching $remote pull/$pr_num/head..." -ForegroundColor Gray
-		git fetch $remote pull/$pr_num/head
+        git fetch $remote pull/$pr_num/head
 
-		if ($LASTEXITCODE -ne 0) {
-			Write-Host "❌ Failed to fetch PR #$pr_num. Skipping." -ForegroundColor Red
-			return
-		}
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to fetch PR #$pr_num from '$remote'."
+        }
 
-		# Merge directly from FETCH_HEAD (no local pr-* branch)
-		$mergeOutput = git merge FETCH_HEAD --no-ff --no-commit 2>&1 | Out-String
-		#$mergeOutput = git merge FETCH_HEAD --no-ff --no-commit 2>&1 | Tee-Object -Variable mergeOutput | Out-String
+        # Merge directly from FETCH_HEAD (no local pr-* branch)
+        $mergeOutput = @(git merge FETCH_HEAD --no-ff --no-commit 2>&1)
+        $mergeExitCode = $LASTEXITCODE
 
         # Check if already up to date
         if ($mergeOutput -match "Already up to date" -or $mergeOutput -match "Already up-to-date") {
@@ -179,7 +191,12 @@ function Merge-PR {
 
         # Check if there are actual conflicts (files with conflict markers)
         $conflictFiles = git diff --name-only --diff-filter=U
-        
+
+        if ($mergeExitCode -ne 0 -and -not $conflictFiles) {
+            Write-Host ($mergeOutput -join [Environment]::NewLine) -ForegroundColor Gray
+            throw "Merge failed for PR #$pr_num without resolvable file conflicts."
+        }
+
         if ($conflictFiles) {
             # CONFLICT PATH - there are unresolved conflicts
             Write-Host "🧩 Conflicts detected while merging PR #$pr_num. Please resolve." -ForegroundColor Yellow
@@ -187,8 +204,7 @@ function Merge-PR {
             git mergetool
 
             if ($LASTEXITCODE -ne 0) {
-                Write-Host "❌ Mergetool failed or was aborted. Halting." -ForegroundColor Red
-                exit 1
+                throw "Mergetool failed or was aborted for PR #$pr_num."
             }
 
             # Check again if there are still unresolved conflicts after mergetool
@@ -196,8 +212,7 @@ function Merge-PR {
             if ($conflictFiles) {
                 Write-Host "❌ Unresolved conflicts remain in the following files:" -ForegroundColor Red
                 $conflictFiles | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
-                Write-Host "Please resolve all conflicts before continuing." -ForegroundColor Red
-                exit 1
+                throw "Unresolved conflicts remain for PR #$pr_num."
             }
 
             Write-Host "✅ Conflicts resolved successfully." -ForegroundColor Green
@@ -211,7 +226,12 @@ function Merge-PR {
         if (-not $statusOutput) {
             Write-Host "✅ PR #$pr_num merged but nothing to commit (working tree clean)." -ForegroundColor Green
             Write-Host "Aborting merge state..."
-            git merge --abort 2>&1 | Out-Null
+            if (Test-GitRef -Ref "MERGE_HEAD") {
+                git merge --abort
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Failed to abort the empty merge for PR #$pr_num."
+                }
+            }
             Write-Host "Skipping commit and push."
             Write-Host "------------------------------------------------`n"
             return
@@ -220,448 +240,803 @@ function Merge-PR {
         # After merge is clean (either no conflicts or conflicts resolved), commit and push
         Write-Host "Staging all changes..."
         git add -A
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to stage PR #$pr_num."
+        }
 
         Write-Host "Committing the merge..."
         git commit -m "Merge PR #$pr_num for testing"
 
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "❌ Commit failed. Please check manually." -ForegroundColor Red
-            exit 1
+            throw "Failed to commit PR #$pr_num."
         }
 
         Write-Host "✅ Committed PR #$pr_num successfully." -ForegroundColor Green
-        git push
 
         Write-Host "Successfully merged PR #$pr_num."
         Write-Host "------------------------------------------------`n"
     }
 }
 function Import-PrsJson {
-	if (-not (Test-Path $prsJsonPath)) {
-		Write-Host "❌ PR JSON file not found at $prsJsonPath" -ForegroundColor Red
-		exit 1
-	} else {
-		Write-Host "✅ PR JSON file loaded from at $prsJsonPath." -ForegroundColor Green
-	}
-	try {
-		$raw = Get-Content -Path $prsJsonPath -Raw
-		$parsed = $raw | ConvertFrom-Json
-	} catch {
-		Write-Host "❌ Failed to parse PR JSON file at $prsJsonPath" -ForegroundColor Red
-		Write-Host ($_.Exception.Message | Out-String) -ForegroundColor Gray
-		exit 1
-	}
-	$script:all_prs = @()
-	foreach ($entry in $parsed) {
-		$prs = @()
-		if ($null -ne $entry.PRs) { $prs = @($entry.PRs) }
-		$script:all_prs += @{
-			Path = [string]$entry.Path
-			Remote = [string]$entry.Remote
-			PRs = $prs
-		}
-	}
-	$script:all_prsByPath = @{}
-	foreach ($group in $script:all_prs) {
-		if (-not $script:all_prsByPath.ContainsKey($group.Path)) {
-			$script:all_prsByPath[$group.Path] = @{}
-		}
-		$script:all_prsByPath[$group.Path][$group.Remote] = $group
-	}
+    if (-not (Test-Path -LiteralPath $prsJsonPath -PathType Leaf)) {
+        throw "PR JSON file not found at $prsJsonPath."
+    }
+
+    try {
+        $script:prsConfig = Get-Content -LiteralPath $prsJsonPath -Raw | ConvertFrom-Json
+    } catch {
+        throw "Failed to parse PR JSON file at $prsJsonPath. $($_.Exception.Message)"
+    }
+
+    if ($script:prsConfig.SchemaVersion -ne 2) {
+        throw "Unsupported PR JSON schema version '$($script:prsConfig.SchemaVersion)'. Expected version 2."
+    }
+
+    $script:all_prs = @()
+    $script:all_prsByPath = @{}
+    $script:repositoryConfigByPath = @{}
+
+    foreach ($repository in @($script:prsConfig.Repositories)) {
+        $locationName = [string]$repository.Location
+        $repositoryPath = [string]$repository.Path
+        if ([string]::IsNullOrWhiteSpace($locationName) -or [string]::IsNullOrWhiteSpace($repositoryPath)) {
+            throw "Every repository entry must have non-empty Location and Path values."
+        }
+
+        $repositoryKey = "$locationName`n$repositoryPath"
+        if ($script:repositoryConfigByPath.ContainsKey($repositoryKey)) {
+            throw "Duplicate repository configuration for $locationName/$repositoryPath."
+        }
+
+        $sourceIndexes = @{}
+        $sourceKeys = @{}
+        $sources = @($repository.Sources)
+        if ($sources.Count -eq 0) {
+            throw "Repository $locationName/$repositoryPath must have at least one source."
+        }
+        foreach ($source in $sources) {
+            $sourceIndex = 0
+            if (-not [int]::TryParse([string]$source.Index, [ref]$sourceIndex) -or $sourceIndex -lt 1) {
+                throw "Invalid source Index '$($source.Index)' for $locationName/$repositoryPath."
+            }
+            if ($sourceIndexes.ContainsKey($sourceIndex)) {
+                throw "Duplicate source Index '$sourceIndex' for $locationName/$repositoryPath."
+            }
+            $sourceIndexes[$sourceIndex] = $true
+
+            $remote = [string]$source.Remote
+            $branch = [string]$source.Branch
+            $strategy = [string]$source.Strategy
+            if ([string]::IsNullOrWhiteSpace($remote) -or [string]::IsNullOrWhiteSpace($branch)) {
+                throw "Every source for $locationName/$repositoryPath must have Remote and Branch values."
+            }
+            git check-ref-format "refs/heads/$branch" *> $null
+            if ($LASTEXITCODE -ne 0) {
+                throw "Invalid branch name '$branch' for $locationName/$repositoryPath $remote."
+            }
+            if ($strategy -notin @("ff-only", "merge", "fetch-only")) {
+                throw "Invalid strategy '$strategy' for $locationName/$repositoryPath $remote/$branch."
+            }
+
+            $sourceKey = "$remote`n$branch"
+            if ($sourceKeys.ContainsKey($sourceKey)) {
+                throw "Duplicate source $remote/$branch for $locationName/$repositoryPath."
+            }
+            $sourceKeys[$sourceKey] = $true
+
+            $seenPrs = @{}
+            foreach ($pr in @($source.PRs)) {
+                $prNumber = 0
+                if (-not [int]::TryParse([string]$pr, [ref]$prNumber) -or $prNumber -lt 1) {
+                    throw "Invalid PR '$pr' for $locationName/$repositoryPath $remote/$branch."
+                }
+                if ($seenPrs.ContainsKey($prNumber)) {
+                    throw "Duplicate PR #$prNumber for $locationName/$repositoryPath $remote/$branch."
+                }
+                $seenPrs[$prNumber] = $true
+            }
+
+            $group = [pscustomobject]@{
+                Location = $locationName
+                Path = $repositoryPath
+                Index = $sourceIndex
+                Remote = $remote
+                Branch = $branch
+                Strategy = $strategy
+                PRs = @($source.PRs)
+                SourceConfig = $source
+            }
+            $script:all_prs += $group
+        }
+
+        $expectedIndex = 1
+        foreach ($sourceIndex in @($sourceIndexes.Keys | Sort-Object)) {
+            if ($sourceIndex -ne $expectedIndex) {
+                throw "Source indexes for $locationName/$repositoryPath must be contiguous starting at 1."
+            }
+            $expectedIndex++
+        }
+
+        $script:repositoryConfigByPath[$repositoryKey] = $repository
+        $script:all_prsByPath[$repositoryKey] = @{}
+        foreach ($group in @($script:all_prs | Where-Object {
+            $_.Location -eq $locationName -and $_.Path -eq $repositoryPath
+        })) {
+            $script:all_prsByPath[$repositoryKey]["$($group.Remote)`n$($group.Branch)"] = $group
+        }
+    }
+
+    Write-Host "✅ PR and remote configuration loaded from $prsJsonPath." -ForegroundColor Green
 }
 
 function Save-PrsJson {
-	try {
-		$all_prs | ConvertTo-Json -Depth 5 | Set-Content -Path $prsJsonPath
-	} catch {
-		Write-Host "❌ Failed to write PR JSON file at $prsJsonPath" -ForegroundColor Red
-		Write-Host ($_.Exception.Message | Out-String) -ForegroundColor Gray
-	}
+    try {
+        $json = $script:prsConfig | ConvertTo-Json -Depth 10
+        $json = $json -replace "`r`n?", "`n"
+        [System.IO.File]::WriteAllText(
+            $prsJsonPath,
+            $json + "`n",
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        $script:prsConfigChanged = $true
+    } catch {
+        throw "Failed to write PR JSON file at $prsJsonPath. $($_.Exception.Message)"
+    }
 }
 
 function Remove-PrFromJson {
-	param (
-		[int]$pr_num,
-		[string]$remote
-	)
-	if ($all_prsByPath.Count -eq 0) {
-		Import-PrsJson
-	}
-	$currentDirName = (Get-Location).Path | Split-Path -Leaf
-	if (-not $all_prsByPath.ContainsKey($currentDirName)) {
-		Write-Host "⚠️ No PR group found for folder $currentDirName in JSON." -ForegroundColor Yellow
-		return
-	}
-	if (-not $all_prsByPath[$currentDirName].ContainsKey($remote)) {
-		Write-Host "⚠️ No PR group found for remote $remote in folder $currentDirName." -ForegroundColor Yellow
-		return
-	}
-	$group = $all_prsByPath[$currentDirName][$remote]
-	$originalCount = @($group.PRs).Count
-	$group.PRs = @($group.PRs | Where-Object { $_ -ne $pr_num })
-	if (@($group.PRs).Count -eq $originalCount) {
-		Write-Host "ℹ️ PR #$pr_num not found in JSON list for $currentDirName/$remote." -ForegroundColor Gray
-		return
-	}
-	Save-PrsJson
-	Write-Host "✅ Removed PR #$pr_num from JSON list for $currentDirName/$remote." -ForegroundColor Green
+    param (
+        [int]$pr_num,
+        [string]$remote,
+        [string]$branch,
+        [string]$location
+    )
+
+    if ($all_prsByPath.Count -eq 0) {
+        Import-PrsJson
+    }
+
+    $currentDirName = Split-Path -Leaf (Get-Location).Path
+    $repositoryKey = "$location`n$currentDirName"
+    $sourceKey = "$remote`n$branch"
+    if (-not $all_prsByPath.ContainsKey($repositoryKey) -or
+        -not $all_prsByPath[$repositoryKey].ContainsKey($sourceKey)) {
+        Write-Host "⚠️ No PR group found for $location/$currentDirName $remote/$branch." -ForegroundColor Yellow
+        return
+    }
+
+    $group = $all_prsByPath[$repositoryKey][$sourceKey]
+    $remainingPrs = @($group.SourceConfig.PRs | Where-Object { $_ -ne $pr_num })
+    if ($remainingPrs.Count -eq @($group.SourceConfig.PRs).Count) {
+        Write-Host "ℹ️ PR #$pr_num not found for $location/$currentDirName $remote/$branch." -ForegroundColor Gray
+        return
+    }
+
+    $group.SourceConfig.PRs = $remainingPrs
+    $group.PRs = $remainingPrs
+    Save-PrsJson
+    Write-Host "✅ Removed PR #$pr_num from $location/$currentDirName $remote/$branch." -ForegroundColor Green
 }
 
-function check_dir_then_merge {
-	$currentDirName = (Get-Location).Path | Split-Path -Leaf
+function Import-UpdateLocations {
+    if (-not (Test-Path -LiteralPath $locationsJsonPath -PathType Leaf)) {
+        throw "Update locations JSON file not found at $locationsJsonPath."
+    }
 
-	foreach ($prGroup in $all_prs) {
-		if ($currentDirName -eq $prGroup.Path) {
-			$remote = $prGroup.Remote
-			$prs = $prGroup.PRs | Sort-Object
-			Write-Host "--- Match found! Folder: $currentDirName (Remote: $remote) ---" -ForegroundColor Cyan
-			foreach ($pr in $prs) {
-				Merge-PR -pr_num $pr -remote $remote
-			}
-			Write-Host "✅ All matching PRs processed." -ForegroundColor Cyan
-		} else {
-			# Write-Host "⏭️ Skipping PR group for $($prGroup.Path) (Current: $currentDirName)" -ForegroundColor Yellow
-		}
-	}
+    try {
+        $script:locationsConfig = Get-Content -LiteralPath $locationsJsonPath -Raw | ConvertFrom-Json
+    } catch {
+        throw "Failed to parse update locations JSON at $locationsJsonPath. $($_.Exception.Message)"
+    }
+
+    if ($script:locationsConfig.SchemaVersion -ne 1) {
+        throw "Unsupported locations schema version '$($script:locationsConfig.SchemaVersion)'. Expected version 1."
+    }
+
+    $locationNames = @{}
+    $locationsByName = @{}
+    foreach ($location in @($script:locationsConfig.Locations)) {
+        $name = [string]$location.Name
+        $path = [string]$location.Path
+        $scan = [string]$location.Scan
+        if ([string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($path)) {
+            throw "Every update location must have non-empty Name and Path values."
+        }
+        if ($locationNames.ContainsKey($name)) {
+            throw "Duplicate update location '$name'."
+        }
+        $locationNames[$name] = $true
+        $locationsByName[$name] = $location
+
+        if (-not [System.IO.Path]::IsPathRooted($path)) {
+            throw "Update location '$name' must use an absolute path: $path"
+        }
+        if ($scan -notin @("self", "children")) {
+            throw "Invalid Scan value '$scan' for update location '$name'."
+        }
+        foreach ($property in @("Fetch", "Merge", "MergePRs")) {
+            if ($location.PSObject.Properties.Name -notcontains $property -or
+                $location.$property -isnot [bool]) {
+                throw "Update location '$name' must have a Boolean $property value."
+            }
+        }
+    }
+
+    foreach ($repository in @($script:prsConfig.Repositories)) {
+        $locationName = [string]$repository.Location
+        if (-not $locationNames.ContainsKey($locationName)) {
+            throw "Repository '$($repository.Path)' references unknown location '$($repository.Location)'."
+        }
+
+        $location = $locationsByName[$locationName]
+        $repositoryName = [string]$repository.Path
+        if ([System.IO.Path]::GetFileName($repositoryName) -ne $repositoryName) {
+            throw "Repository Path must be one directory name, not a nested path: $locationName/$repositoryName"
+        }
+        $configuredPath = if ($location.Scan -eq "self") {
+            if ((Split-Path -Leaf $location.Path) -ne $repositoryName) {
+                $expectedRepository = Split-Path -Leaf $location.Path
+                throw "Self-scanned location '$locationName' must configure repository '$expectedRepository'."
+            }
+            $location.Path
+        } else {
+            Join-Path $location.Path $repositoryName
+        }
+
+        $locationEnabled = $location.Fetch -or $location.Merge -or $location.MergePRs
+        if ($locationEnabled -and -not (Test-Path -LiteralPath $configuredPath -PathType Container)) {
+            throw "Configured repository does not exist: $configuredPath"
+        }
+    }
+
+    Write-Host "✅ Update locations loaded from $locationsJsonPath." -ForegroundColor Green
 }
 
-Import-PrsJson
+function Test-GitRef {
+    param ([string]$Ref)
 
-if ($debug) {
-	# Write contents of $all_prs after populating it
-	Write-Host "`$all_prs contents:" -ForegroundColor Cyan
-	if ($all_prs.Count -eq 0) {
-		Write-Host "all_prs is empty" -ForegroundColor Red
-	} else {
-		$all_prs | ConvertTo-Json -Depth 5 | Write-Host
-	}
+    git rev-parse --verify --quiet $Ref *> $null
+    return $LASTEXITCODE -eq 0
 }
 
-if ($updatecore) {
-	if ($myrepo) {
-		# ==============================
-		# 0. Create a branch for testing
-		# ==============================
-		# make sure my origin/integrate is up to date:
-		# git checkout integrate
-		# git pull
-		# or use update below
-		#
-		# git checkout -b pr-23233
-		# git fetch azerothcore pull/23233/head:pr-23233-temp
-		# git merge --no-ff pr-23233-temp -m "Merge azerothcore PR #23233 for testing"
-		# git mergetool
-		# git branch -d pr-23233-temp
-		# git push --set-upstream origin pr-23233
-		# git push
-		# test and once done, delete:
-		# git checkout integrate
-		# git branch -D pr-23233
+function Get-GitOperationState {
+    if (Test-GitRef -Ref "MERGE_HEAD") {
+        return "merge"
+    }
+    if (Test-GitRef -Ref "CHERRY_PICK_HEAD") {
+        return "cherry-pick"
+    }
+    if (Test-GitRef -Ref "REVERT_HEAD") {
+        return "revert"
+    }
 
-		# ==============================
-		# Directly merge a PR
-		# ==============================
-		# $pr_num = 1813
-		#
-		## azerothcore:
-		## git fetch azerothcore pull/$pr_num/head:pr-$pr_num
-		#
-		## mod-playerbots:
-		## git fetch upstream pull/$pr_num/head:pr-$pr_num
-		# 
-		# git merge "pr-$pr_num" --no-ff -m "Merge PR #$pr_num from upstream"
-		# git mergetool
-		# git add -A && git commit --amend --no-edit && git push
+    $gitDirectoryOutput = @(git rev-parse --git-dir 2>$null)
+    $gitExitCode = $LASTEXITCODE
+    $gitDirectory = $gitDirectoryOutput | Select-Object -First 1
+    if ($gitExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($gitDirectory)) {
+        throw "Unable to resolve the Git directory for $((Get-Location).Path)."
+    }
+    if (-not [System.IO.Path]::IsPathRooted($gitDirectory)) {
+        $gitDirectory = Join-Path (Get-Location).Path $gitDirectory
+    }
 
-		# ==============================
-		# Unmerge it
-		# ==============================
-		# $pr_num = 1912
-		# $commit_hash = git log --grep="PR #$pr_num" --merges --format="%H" -n 1
-		# $commit_hash
-		# git revert -m 1 $commit_hash --no-edit
-		# git push
+    if (Test-Path -LiteralPath (Join-Path $gitDirectory "rebase-merge") -PathType Container) {
+        return "rebase"
+    }
+    if (Test-Path -LiteralPath (Join-Path $gitDirectory "rebase-apply") -PathType Container) {
+        return "rebase-or-am"
+    }
+    if (Test-Path -LiteralPath (Join-Path $gitDirectory "BISECT_START") -PathType Leaf) {
+        return "bisect"
+    }
+    if (Test-Path -LiteralPath (Join-Path $gitDirectory "sequencer") -PathType Container) {
+        return "sequencer"
+    }
 
-		# ==============================
-		# 1. Pre-flight Checks
-		# =============================
-		
-		$my_branch = (git rev-parse --abbrev-ref HEAD).Trim()
-		Write-Host "On branch: $my_branch" -ForegroundColor Green
-
-		# Check if on master branch
-		if ($my_branch -ne "integrate_with_prs") {
-			Write-Host "⚠️  WARNING: You are not on the 'integrate_with_prs' branch!" -ForegroundColor Yellow
-			Write-Host "Current branch: $my_branch" -ForegroundColor Yellow
-			$choice = Read-Host "Do you want to continue anyway? (y/n)"
-			if ($choice -ne 'y') {
-				Write-Host "❌ Aborted. Please switch to 'integrate_with_prs' branch and try again." -ForegroundColor Red
-				exit 1
-			}
-			Write-Host "✅ Continuing on branch: $my_branch" -ForegroundColor Green
-		}
-
-		Write-Host "🟢 Checking for local changes in my main repo..." -ForegroundColor Cyan
-
-		# Check if the working directory is dirty (has uncommitted changes)
-		if (git status --porcelain) {
-			Write-Host "❌ Uncommitted changes detected." -ForegroundColor Red
-			git status --short
-			Write-Host "Staging and committing resolved files..." -ForegroundColor Yellow
-			git add -A
-			git commit -m "Remediation."
-			if ($LASTEXITCODE -ne 0) {
-				Write-Host "❌ Commit failed after conflict resolution. Please check manually." -ForegroundColor Red
-				exit 1
-			}
-			git push
-		} else {
-			Write-Host "✅ Working directory is clean. No local changes." -ForegroundColor Green
-		}
-
-		Write-Host "🟢 FYI, the remotes..." -ForegroundColor Green
-		git remote -v
-
-		Write-Host "🟢 Fetching all remotes..." -ForegroundColor Cyan
-		git fetch --all --prune
-
-		# ==============================
-		# 2. Pre-merge Analysis
-		# ==============================
-
-		#Write-Host "📊 Comparing commit counts (Playerbot):" -ForegroundColor Yellow
-		#git rev-list --left-right --count "origin/$($my_branch)...pbazerothcore/test-staging"
-		Write-Host "📈 Whats new in playerbot, that I do not have:" -ForegroundColor Yellow
-		git --no-pager diff origin/$($my_branch)...pbazerothcore/test-staging --stat
-
-		#Write-Host "📊 Comparing commit counts (azerothcore):" -ForegroundColor Yellow
-		#git rev-list --left-right --count origin/$($my_branch)...azerothcore/master
-		Write-Host "📈 Whats new in azerothcore, that I do not have:" -ForegroundColor Yellow
-		git --no-pager diff origin/$($my_branch)...azerothcore/master --stat
-
-		# ==============================
-		# 3. Merge from Playerbot (Bot fixes + AC changes)
-		# ==============================
-		Write-Host "🔄 Merging from pbazerothcore/test-staging..." -ForegroundColor Cyan
-
-		git merge --no-ff --no-edit pbazerothcore/test-staging
-
-		if ($LASTEXITCODE -ne 0) {
-			Write-Host "🧩 Conflicts detected with pbazerothcore/test-staging. Please resolve." -ForegroundColor Yellow
-			Write-Host "Opening mergetool..."
-			git mergetool
-		
-			if ($LASTEXITCODE -ne 0) {
-				Write-Host "❌ Mergetool failed or was aborted. Halting." -ForegroundColor Red
-				exit 1
-			}
-			
-			# Check if there are still unresolved conflicts
-			$conflictFiles = git diff --name-only --diff-filter=U
-			if ($conflictFiles) {
-				Write-Host "❌ Unresolved conflicts remain in the following files:" -ForegroundColor Red
-				$conflictFiles | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
-				Write-Host "Please resolve all conflicts before continuing." -ForegroundColor Red
-				exit 1
-			}
-			
-			Write-Host "✅ Conflicts resolved successfully." -ForegroundColor Green
-		} else {
-			Write-Host "✅ Clean merge from pbazerothcore/test-staging." -ForegroundColor Green
-		}
-
-		Write-Host "Staging and committing resolved from files pbazerothcore/test-staging...." -ForegroundColor Yellow
-		git add -A
-		git commit -m "Merge test-staging branch into $($my_branch)"
-
-		# ==============================
-		# 4. Merge from AzerothCore (Remaining AC changes)
-		# ==============================
-		Write-Host "🔄 Merging from azerothcore/master..." -ForegroundColor Cyan
-
-		git merge --no-ff --no-edit azerothcore/master
-
-		if ($LASTEXITCODE -ne 0) {
-			Write-Host "🧩 Conflicts detected with azerothcore/master. Please resolve." -ForegroundColor Yellow
-			Write-Host "Opening mergetool..."
-			git mergetool
-			
-			if ($LASTEXITCODE -ne 0) {
-				Write-Host "❌ Mergetool failed or was aborted. Halting." -ForegroundColor Red
-				exit 1
-			}
-			
-			# Check if there are still unresolved conflicts
-			$conflictFiles = git diff --name-only --diff-filter=U
-			if ($conflictFiles) {
-				Write-Host "❌ Unresolved conflicts remain in the following files:" -ForegroundColor Red
-				$conflictFiles | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
-				Write-Host "Please resolve all conflicts before continuing." -ForegroundColor Red
-				exit 1
-			}
-			
-			Write-Host "✅ Conflicts resolved successfully." -ForegroundColor Green
-		} else {
-			Write-Host "✅ Clean merge from azerothcore/master." -ForegroundColor Green
-		}
-
-		Write-Host "Staging and committing resolved files from azerothcore/master..."
-		git add -A
-		git commit -m "Merge azerothcore/master into $($my_branch)."
-
-		# ==============================
-		# 5. Merge PRs
-		# ==============================
-
-		if ($merge_prs) {check_dir_then_merge}
-
-		# ==============================
-		# 6. Push & Verify
-		# ==============================
-		Write-Host "🎉 Both upstreams merged successfully. Pushing to origin..." -ForegroundColor Green
-		git push
-
-		Write-Host "✅ Verifying synchronization..." -ForegroundColor Green
-		#Write-Host "📊 Comparing commit counts (Playerbot):" -ForegroundColor Yellow
-		#git rev-list --left-right --count "origin/$($my_branch)...pbazerothcore/test-staging
-		Write-Host "📈 Whats new in playerbot, that I do not have:" -ForegroundColor Yellow
-		git --no-pager diff origin/$($my_branch)...pbazerothcore/test-staging --stat
-
-		#Write-Host "📊 Comparing commit counts (azerothcore):" -ForegroundColor Yellow
-		#git rev-list --left-right --count origin/$($my_branch)...azerothcore/master
-		Write-Host "📈 Whats new in azerothcore, that I do not have:" -ForegroundColor Yellow
-		git --no-pager diff origin/$($my_branch)...azerothcore/master --stat
-
-		Write-Host "🎉 All merges and sync operations completed successfully!" -ForegroundColor Green
-
-	} else {
-		#update from original repo
-		#Write-Host "Updating ${basepath}" -ForegroundColor Green
-		#git pull --recurse-submodules
-		#if ($LASTEXITCODE -ne 0) { Write-Host "❌ Error. Halting."; exit 1 }
-		#git submodule update --init --recursive
-		#if ($LASTEXITCODE -ne 0) { Write-Host "❌ Error. Halting."; exit 1 }
-	}
+    return "none"
 }
-if ($updatemodules) {
-	Get-ChildItem -Path "${basepath}\modules\" -Directory | ForEach-Object {
-		Push-Location $_.FullName
-		$my_branch = (git rev-parse --abbrev-ref HEAD).Trim()
-		Write-Host "On branch: $my_branch" -ForegroundColor Green
-		if ($mymodulerepo -and $_.FullName -like "*mod-character-services*") {
-			# ==============================
-			# Update my fork of mod-character-services 
-			# ==============================
-			Write-Host "Updating my fork of module mod-character-services..." -ForegroundColor Green
-			Set-Location "${basepath}\modules\mod-character-services"
-			git add -A && git commit -m "Upstream merge" && git push
-			git fetch --all --prune
-			Write-Host "My differences from badgermilk/main:" -ForegroundColor Green
-			git diff badgermilk/main --stat
-			Write-Host "My differences from zerkenn/main:" -ForegroundColor Green
-			git diff zerkenn/main --stat
-			git merge --no-commit --no-ff badgermilk/main  #this updates my files
-			if ($LASTEXITCODE -ne 0) {
-				git mergetool
-				if ($LASTEXITCODE -ne 0) {
-					Write-Host "❌ Mergetool failed or was aborted for badgermilk/main. Halting." -ForegroundColor Red
-					exit 1
-				}
-				$conflictFiles = git diff --name-only --diff-filter=U
-				if ($conflictFiles) {
-					Write-Host "❌ Unresolved conflicts remain. Halting." -ForegroundColor Red
-					exit 1
-				}
-			}
-			git merge --no-commit --no-ff zerkenn/main  #this updates my files
-			if ($LASTEXITCODE -ne 0) {
-				git mergetool
-				if ($LASTEXITCODE -ne 0) {
-					Write-Host "❌ Mergetool failed or was aborted for zerkenn/main. Halting." -ForegroundColor Red
-					exit 1
-				}
-				$conflictFiles = git diff --name-only --diff-filter=U
-				if ($conflictFiles) {
-					Write-Host "❌ Unresolved conflicts remain. Halting." -ForegroundColor Red
-					exit 1
-				}
-			}
-			if ($merge_prs) {check_dir_then_merge }
-			git add -A && git commit -m "Upstream merge." && git push
-			Write-Host "My fork of module mod-character-services is now current." -ForegroundColor Green
-		}
-		elseif ($mymodulerepo -and $_.FullName -like "*mod-playerbots*") {
-			# ==============================
-			# Update my fork of mod-playerbots
-			# ==============================
-			Write-Host "Updating my fork of module mod-playerbots..." -ForegroundColor Green
-			Set-Location "${basepath}\modules\mod-playerbots"
-			git add -A && git commit -m "Upstream merge" && git push
-			git fetch --all --prune
-			Write-Host "My differences from upstream:" -ForegroundColor Green
-			git diff upstream/test-staging --stat
-			git merge --no-commit --no-ff upstream/test-staging #this updates my files
-			if ($LASTEXITCODE -ne 0) {
-				git mergetool
-				if ($LASTEXITCODE -ne 0) {
-					Write-Host "❌ Mergetool failed or was aborted for upstream/test-staging Halting." -ForegroundColor Red
-					exit 1
-				}
-				$conflictFiles = git diff --name-only --diff-filter=U
-				if ($conflictFiles) {
-					Write-Host "❌ Unresolved conflicts remain. Halting." -ForegroundColor Red
-					exit 1
-				}
-			}
-			if ($merge_prs) {check_dir_then_merge }
-			git add -A && git commit -m "Upstream merge." && git push
-			Write-Host "My fork of module mod-playerbot is now current." -ForegroundColor Green
-			}
-		else {
-			# Continue with existing error handling (applies to all paths)
-			Write-Host "Updating module: $($_.Name)" -ForegroundColor Green
 
-			git pull --no-edit --recurse-submodules
-			if ($LASTEXITCODE -ne 0) {
-				Write-Host "❌ git pull failed." -ForegroundColor Yellow
-				$ans = Read-Host "Hard reset to origin/$(git rev-parse --abbrev-ref HEAD)? (y/N)"
-				if ($ans -ne 'y') { Write-Host "Aborting."; exit 1 }
-					git fetch origin
-					git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
-				if ($LASTEXITCODE -ne 0) { Write-Host "❌ Reset failed."; exit 1 }
-					git pull --no-edit --recurse-submodules
-				if ($LASTEXITCODE -ne 0) { Write-Host "❌ Pull failed after reset."; exit 1 }
-			}
-			git submodule update --init --recursive
-			if ($LASTEXITCODE -ne 0) { Write-Host "❌ Submodule update failed."; exit 1 }
-			if ($merge_prs) {check_dir_then_merge }
-			git add -A && git commit -m "Upstream merge."
-			Write-Host "✅ Module updated successfully." -ForegroundColor Green
-		}
-		Pop-Location
-	}
+function Resolve-GitConflicts {
+    param ([string]$Context)
+
+    $conflictFiles = @(git diff --name-only --diff-filter=U)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to inspect conflicts while $Context."
+    }
+    if ($conflictFiles.Count -eq 0) {
+        return
+    }
+
+    Write-Host "🧩 Conflicts detected while $Context." -ForegroundColor Yellow
+    $conflictFiles | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+    git mergetool
+    if ($LASTEXITCODE -ne 0) {
+        throw "Mergetool failed or was aborted while $Context."
+    }
+
+    $conflictFiles = @(git diff --name-only --diff-filter=U)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to recheck conflicts while $Context."
+    }
+    if ($conflictFiles.Count -gt 0) {
+        throw "Unresolved conflicts remain while ${Context}: $($conflictFiles -join ', ')"
+    }
 }
-if ($updateeluna) {
-	Set-Location "J:\Code\Games\wow\eluna"
-	Get-ChildItem . -Directory | ForEach-Object {
-		Write-Host "Updating Eluna module: $($_.Name)" -ForegroundColor Green
-		Push-Location $_.FullName
-		git pull --recurse-submodules
-		if ($LASTEXITCODE -ne 0) { Write-Host "⚠️ Error updating $($_.Name). Continuing..."; }
-		Pop-Location
-	}
-	Set-Location "${basepath}"
+
+function Complete-PendingGitMerge {
+    $operation = Get-GitOperationState
+    if ($operation -eq "none") {
+        $conflictFiles = @(git diff --name-only --diff-filter=U)
+        if ($conflictFiles.Count -gt 0) {
+            throw "Unmerged files exist without an active merge: $($conflictFiles -join ', ')"
+        }
+        return
+    }
+    if ($operation -ne "merge") {
+        throw "Repository has an unfinished $operation operation. Complete or abort it before updating."
+    }
+
+    Write-Host "⚠️ Completing an unfinished merge before fetching updates." -ForegroundColor Yellow
+    Resolve-GitConflicts -Context "completing the existing merge"
+    git add -A
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to stage the completed merge."
+    }
+    git commit --no-edit
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to commit the completed merge."
+    }
 }
-if ($updatetools) {
-	Set-Location "J:\Code\Games\wow\tools"
-	Get-ChildItem . -Directory | ForEach-Object {
-		Write-Host "Updating tool: $($_.Name)" -ForegroundColor Green
-		Push-Location $_.FullName
-		git pull --recurse-submodules
-		if ($LASTEXITCODE -ne 0) { Write-Host "⚠️ Error updating $($_.Name). Continuing..."; }
-		Pop-Location
-	}
-	Set-Location "${basepath}"
+
+function Save-LocalChanges {
+    $status = @(git status --porcelain=v1 --untracked-files=all)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to inspect repository status."
+    }
+    if ($status.Count -eq 0) {
+        Write-Host "✅ Working directory is clean." -ForegroundColor Green
+        return
+    }
+
+    Write-Host "⚠️ Committing local changes before upstream merges:" -ForegroundColor Yellow
+    $status | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+    git add -A
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to stage local changes."
+    }
+
+    git diff --cached --quiet
+    $diffExitCode = $LASTEXITCODE
+    if ($diffExitCode -eq 0) {
+        Write-Host "No stageable local changes were found." -ForegroundColor Gray
+        return
+    }
+    if ($diffExitCode -ne 1) {
+        throw "Failed to inspect staged local changes."
+    }
+
+    git commit -m "Local changes before upstream merge."
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to commit local changes before upstream merges."
+    }
+
+    $remainingStatus = @(git status --porcelain=v1 --untracked-files=all)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to verify local changes after committing."
+    }
+    if ($remainingStatus.Count -gt 0) {
+        throw "Repository still has uncommitted changes after the safety commit."
+    }
+}
+
+function Get-RepositoryDirectories {
+    param ([pscustomobject]$Location)
+
+    if (-not $Location.Fetch -and -not $Location.Merge -and -not $Location.MergePRs) {
+        Write-Host "⏭️ Update location '$($Location.Name)' is disabled." -ForegroundColor DarkGray
+        return
+    }
+    if (-not (Test-Path -LiteralPath $Location.Path -PathType Container)) {
+        throw "Enabled update location '$($Location.Name)' does not exist: $($Location.Path)"
+    }
+
+    $candidates = if ($Location.Scan -eq "self") {
+        @(Get-Item -LiteralPath $Location.Path)
+    } else {
+        @(Get-ChildItem -LiteralPath $Location.Path -Directory | Sort-Object Name)
+    }
+
+    foreach ($candidate in $candidates) {
+        $topLevelOutput = @(git -C $candidate.FullName rev-parse --show-toplevel 2>$null)
+        $gitExitCode = $LASTEXITCODE
+        $topLevel = $topLevelOutput | Select-Object -First 1
+        if ($gitExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($topLevel)) {
+            if (Test-Path -LiteralPath (Join-Path $candidate.FullName ".git")) {
+                throw "Unable to inspect Git repository $($candidate.FullName)."
+            }
+            continue
+        }
+
+        $candidatePath = [System.IO.Path]::GetFullPath($candidate.FullName).TrimEnd("\", "/")
+        $topLevelPath = [System.IO.Path]::GetFullPath($topLevel).TrimEnd("\", "/")
+        if ($candidatePath -ieq $topLevelPath) {
+            $candidate
+        }
+    }
+}
+
+function Get-RepositorySources {
+    param (
+        [string]$LocationName,
+        [string]$RepositoryName,
+        [string[]]$Remotes
+    )
+
+    $repositoryKey = "$LocationName`n$RepositoryName"
+    if ($repositoryConfigByPath.ContainsKey($repositoryKey)) {
+        $configuredSources = @($all_prs | Where-Object {
+            $_.Location -eq $LocationName -and $_.Path -eq $RepositoryName
+        } | Sort-Object Index)
+
+        $configuredRemotes = @($configuredSources.Remote | Sort-Object -Unique)
+        foreach ($remote in $configuredRemotes) {
+            if ($remote -notin $Remotes) {
+                throw "Configured remote '$remote' does not exist in $LocationName/$RepositoryName."
+            }
+        }
+        if ($Remotes.Count -gt 1) {
+            foreach ($remote in $Remotes) {
+                if ($remote -notin $configuredRemotes) {
+                    $message = "Multi-remote repository $LocationName/$RepositoryName is missing remote " +
+                        "'$remote' in the JSON."
+                    throw $message
+                }
+            }
+        }
+        return $configuredSources
+    }
+
+    if ($Remotes.Count -gt 1) {
+        throw "Multi-remote repository $LocationName/$RepositoryName requires an ordered JSON entry."
+    }
+    if ($Remotes.Count -eq 0) {
+        Write-Host "⏭️ Repository has no remotes; branch merging is skipped." -ForegroundColor Yellow
+        return @()
+    }
+
+    $currentBranchOutput = @(git branch --show-current 2>$null)
+    $gitExitCode = $LASTEXITCODE
+    $currentBranch = $currentBranchOutput | Select-Object -First 1
+    if ($gitExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($currentBranch)) {
+        throw "Repository is in detached HEAD state."
+    }
+
+    $upstreamOutput = @(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>$null)
+    $gitExitCode = $LASTEXITCODE
+    $upstream = $upstreamOutput | Select-Object -First 1
+    if ($gitExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($upstream)) {
+        $remote = @($Remotes | Where-Object { $upstream.StartsWith("$_/", [System.StringComparison]::Ordinal) } |
+            Sort-Object Length -Descending | Select-Object -First 1)
+        if ($remote.Count -ne 1) {
+            throw "Unable to map configured upstream '$upstream' to a remote."
+        }
+        $branch = $upstream.Substring($remote[0].Length + 1)
+    } else {
+        $remote = @($Remotes[0])
+        $branch = $currentBranch
+    }
+
+    return @([pscustomobject]@{
+        Location = $LocationName
+        Path = $RepositoryName
+        Index = 1
+        Remote = [string]$remote[0]
+        Branch = [string]$branch
+        Strategy = "merge"
+        PRs = @()
+        SourceConfig = $null
+    })
+}
+
+function Merge-SourceBranch {
+    param ([pscustomobject]$Source)
+
+    $sourceName = "$($Source.Remote)/$($Source.Branch)"
+    if ($Source.Strategy -eq "fetch-only") {
+        Write-Host "⏭️ $sourceName is configured for fetch only." -ForegroundColor DarkGray
+        return
+    }
+
+    $trackingRef = "refs/remotes/$($Source.Remote)/$($Source.Branch)"
+    if (-not (Test-GitRef -Ref $trackingRef)) {
+        throw "Remote-tracking branch '$sourceName' does not exist after fetching."
+    }
+
+    Write-Host "📊 Pre-merge analysis for $sourceName" -ForegroundColor Yellow
+    $counts = git rev-list --left-right --count "HEAD...$trackingRef"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to compare HEAD with $sourceName. The histories may be unrelated."
+    }
+    Write-Host "Local-only / source-only commits: $counts" -ForegroundColor Gray
+    git --no-pager diff --stat "HEAD...$trackingRef"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to produce the pre-merge diff for $sourceName."
+    }
+
+    Write-Host "🔄 Merging $sourceName with strategy '$($Source.Strategy)'..." -ForegroundColor Cyan
+    if ($Source.Strategy -eq "ff-only") {
+        git merge --ff-only --no-edit $trackingRef
+        if ($LASTEXITCODE -ne 0) {
+            throw "Fast-forward-only merge failed for $sourceName. No fallback merge was attempted."
+        }
+    } else {
+        $mergeOutput = @(git merge --no-commit --no-edit $trackingRef 2>&1)
+        $mergeExitCode = $LASTEXITCODE
+        if ($mergeOutput.Count -gt 0) {
+            Write-Host ($mergeOutput -join [Environment]::NewLine)
+        }
+
+        $conflictFiles = @(git diff --name-only --diff-filter=U)
+        if ($mergeExitCode -ne 0 -and $conflictFiles.Count -eq 0) {
+            throw "Merge failed for $sourceName without resolvable file conflicts."
+        }
+        if ($conflictFiles.Count -gt 0) {
+            Resolve-GitConflicts -Context "merging $sourceName"
+        }
+
+        if (Test-GitRef -Ref "MERGE_HEAD") {
+            git add -A
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to stage the merge from $sourceName."
+            }
+            git commit -m "Upstream merge."
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to commit the merge from $sourceName."
+            }
+        }
+    }
+
+    git merge-base --is-ancestor $trackingRef HEAD
+    if ($LASTEXITCODE -ne 0) {
+        throw "Verification failed: $sourceName is not an ancestor of HEAD after merging."
+    }
+    Write-Host "✅ $sourceName is merged." -ForegroundColor Green
+}
+
+function Merge-SourcePrs {
+    param ([pscustomobject]$Source)
+
+    $prs = @($Source.PRs)
+    if ($prs.Count -eq 0) {
+        return
+    }
+
+    Write-Host "🔀 Processing PRs from $($Source.Remote)/$($Source.Branch)..." -ForegroundColor Cyan
+    foreach ($pr in $prs) {
+        Merge-PR -pr_num ([int]$pr) -remote $Source.Remote -branch $Source.Branch -location $Source.Location
+    }
+}
+
+function Get-OwnedRemote {
+    param (
+        [string[]]$Remotes,
+        [pscustomobject]$RepositoryConfig
+    )
+
+    if ($null -ne $RepositoryConfig -and
+        $RepositoryConfig.PSObject.Properties.Name -contains "PushRemote" -and
+        -not [string]::IsNullOrWhiteSpace([string]$RepositoryConfig.PushRemote)) {
+        $pushRemote = [string]$RepositoryConfig.PushRemote
+        if ($pushRemote -notin $Remotes) {
+            throw "Configured PushRemote '$pushRemote' does not exist."
+        }
+        return $pushRemote
+    }
+
+    $ownedRemotes = @()
+    foreach ($remote in $Remotes) {
+        $pushUrlOutput = @(git remote get-url --push --all $remote 2>$null)
+        $gitExitCode = $LASTEXITCODE
+        if ($gitExitCode -ne 0) {
+            throw "Unable to read the push URL for remote '$remote'."
+        }
+        if ($pushUrlOutput -match "(?i)biship") {
+            $ownedRemotes += $remote
+        }
+    }
+
+    if ($ownedRemotes.Count -gt 1) {
+        throw "More than one remote has a biship URL: $($ownedRemotes -join ', '). Configure PushRemote explicitly."
+    }
+    if ($ownedRemotes.Count -eq 1) {
+        return $ownedRemotes[0]
+    }
+    return $null
+}
+
+function Push-RepositoryBranch {
+    param (
+        [string[]]$Remotes,
+        [pscustomobject]$RepositoryConfig
+    )
+
+    $pushRemote = Get-OwnedRemote -Remotes $Remotes -RepositoryConfig $RepositoryConfig
+    if ([string]::IsNullOrWhiteSpace($pushRemote)) {
+        Write-Host "⏭️ No biship remote found; local commits will not be pushed." -ForegroundColor Yellow
+        return
+    }
+
+    $branchOutput = @(git branch --show-current 2>$null)
+    $gitExitCode = $LASTEXITCODE
+    $branch = $branchOutput | Select-Object -First 1
+    if ($gitExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($branch)) {
+        throw "Cannot push from detached HEAD state."
+    }
+    $status = @(git status --porcelain=v1)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to verify repository status before pushing."
+    }
+    if ($status.Count -gt 0) {
+        throw "Repository is not clean after merging; refusing to push."
+    }
+
+    Write-Host "⬆️ Pushing $branch to $pushRemote..." -ForegroundColor Cyan
+    git push $pushRemote "HEAD:refs/heads/$branch"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Push failed for $pushRemote/$branch."
+    }
+}
+
+function Update-GitRepository {
+    param (
+        [System.IO.DirectoryInfo]$RepositoryDirectory,
+        [pscustomobject]$Location
+    )
+
+    Write-Host "`n================================================" -ForegroundColor DarkCyan
+    Write-Host "Updating $($RepositoryDirectory.FullName)" -ForegroundColor Green
+    Write-Host "================================================" -ForegroundColor DarkCyan
+
+    Push-Location $RepositoryDirectory.FullName
+    try {
+        $branchOutput = @(git branch --show-current 2>$null)
+        $gitExitCode = $LASTEXITCODE
+        $branch = $branchOutput | Select-Object -First 1
+        if ($gitExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($branch)) {
+            throw "Repository is in detached HEAD state."
+        }
+        Write-Host "On branch: $branch" -ForegroundColor Green
+
+        $remotes = @(git remote)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to list remotes."
+        }
+        $repositoryKey = "$($Location.Name)`n$($RepositoryDirectory.Name)"
+        $repositoryConfig = if ($repositoryConfigByPath.ContainsKey($repositoryKey)) {
+            $repositoryConfigByPath[$repositoryKey]
+        } else {
+            $null
+        }
+        $sources = @(Get-RepositorySources -LocationName $Location.Name `
+            -RepositoryName $RepositoryDirectory.Name -Remotes $remotes)
+
+        if ($Location.Merge -or $Location.MergePRs) {
+            Complete-PendingGitMerge
+            Save-LocalChanges
+        }
+
+        if ($Location.Fetch) {
+            Write-Host "🌐 Fetching all remotes..." -ForegroundColor Cyan
+            git fetch --all --prune
+            if ($LASTEXITCODE -ne 0) {
+                throw "Fetch failed. No configured source merges were attempted."
+            }
+        }
+
+        foreach ($source in $sources) {
+            if ($Location.Merge) {
+                Merge-SourceBranch -Source $source
+            }
+            if ($Location.MergePRs) {
+                Merge-SourcePrs -Source $source
+            }
+        }
+
+        if ($Location.Merge) {
+            git submodule update --init --recursive
+            if ($LASTEXITCODE -ne 0) {
+                throw "Submodule update failed."
+            }
+        }
+
+        if ($Location.Merge -or $Location.MergePRs) {
+            Push-RepositoryBranch -Remotes $remotes -RepositoryConfig $repositoryConfig
+        }
+        Write-Host "✅ Repository update completed." -ForegroundColor Green
+    } finally {
+        Pop-Location
+    }
+}
+
+function Complete-PrConfigurationUpdate {
+    if (-not $script:prsConfigChanged) {
+        return
+    }
+
+    $configurationDirectory = Split-Path -Parent $prsJsonPath
+    $repositoryRootOutput = @(git -C $configurationDirectory rev-parse --show-toplevel 2>$null)
+    if ($LASTEXITCODE -ne 0 -or $repositoryRootOutput.Count -eq 0) {
+        throw "Unable to find the repository that owns $prsJsonPath."
+    }
+    $repositoryRoot = $repositoryRootOutput | Select-Object -First 1
+    $relativeConfigPath = [System.IO.Path]::GetRelativePath($repositoryRoot, $prsJsonPath).Replace("\", "/")
+
+    Push-Location $repositoryRoot
+    try {
+        $configStatus = @(git status --porcelain=v1 -- $relativeConfigPath)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to inspect the saved PR configuration."
+        }
+        if ($configStatus.Count -eq 0) {
+            $script:prsConfigChanged = $false
+            return
+        }
+
+        $otherStatus = @(git status --porcelain=v1 -- . ":(exclude)$relativeConfigPath")
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to inspect the configuration repository before committing."
+        }
+        if ($otherStatus.Count -gt 0) {
+            throw "The configuration repository changed again during module processing; refusing to combine changes."
+        }
+
+        git add -A -- $relativeConfigPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to stage the updated PR configuration."
+        }
+        git commit -m "Update PR configuration."
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to commit the updated PR configuration."
+        }
+
+        $remotes = @(git remote)
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to list remotes for the configuration repository."
+        }
+        Push-RepositoryBranch -Remotes $remotes -RepositoryConfig $null
+        $script:prsConfigChanged = $false
+    } finally {
+        Pop-Location
+    }
+}
+
+function Invoke-RepositoryUpdates {
+    foreach ($location in @($locationsConfig.Locations)) {
+        $repositories = @(Get-RepositoryDirectories -Location $location)
+        foreach ($repository in $repositories) {
+            Update-GitRepository -RepositoryDirectory $repository -Location $location
+        }
+    }
+    Complete-PrConfigurationUpdate
+}
+
+try {
+    Import-PrsJson
+    Import-UpdateLocations
+
+    if ($debug) {
+        Write-Host "`$all_prs contents:" -ForegroundColor Cyan
+        if ($all_prs.Count -eq 0) {
+            Write-Host "all_prs is empty" -ForegroundColor Red
+        } else {
+            $all_prs | ConvertTo-Json -Depth 5 | Write-Host
+        }
+    }
+
+    Invoke-RepositoryUpdates
+} catch {
+    Write-Host "❌ Repository update failed: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
 }
 if ($clean) {
 	if (Test-Path "${basepath}\Build") {

@@ -1,26 +1,96 @@
-[
-  {
-    "PRs": [
-      26661
-    ],
-    "Path": "ac",
-    "Remote": "azerothcore"
-  },
-  {
-    "PRs": [],
-    "Path": "ac",
-    "Remote": "pbazerothcore"
-  },
-  {
-    "PRs": [
-      2496,2558,2559,2578,2579,2583,2586,2587,2588,2589,2638, 2681,2684,2685
-    ],
-    "Path": "mod-playerbots",
-    "Remote": "upstream"
-  },
-  {
-    "PRs": [],
-    "Path": "mod-individual-progression",
-    "Remote": "origin"
-  }
-]
+{
+  "SchemaVersion": 2,
+  "Repositories": [
+    {
+      "Location": "ac",
+      "Path": "ac",
+      "Sources": [
+        {
+          "Index": 1,
+          "Remote": "origin",
+          "Branch": "integrate_with_prs",
+          "Strategy": "ff-only",
+          "PRs": []
+        },
+        {
+          "Index": 2,
+          "Remote": "pbazerothcore",
+          "Branch": "test-staging",
+          "Strategy": "merge",
+          "PRs": []
+        },
+        {
+          "Index": 3,
+          "Remote": "azerothcore",
+          "Branch": "master",
+          "Strategy": "merge",
+          "PRs": [
+            26661
+          ]
+        }
+      ]
+    },
+    {
+      "Location": "modules",
+      "Path": "mod-ale",
+      "Sources": [
+        {
+          "Index": 1,
+          "Remote": "origin",
+          "Branch": "master",
+          "Strategy": "ff-only",
+          "PRs": []
+        },
+        {
+          "Index": 2,
+          "Remote": "official",
+          "Branch": "master",
+          "Strategy": "merge",
+          "PRs": []
+        },
+        {
+          "Index": 3,
+          "Remote": "aldori",
+          "Branch": "master",
+          "Strategy": "merge",
+          "PRs": []
+        }
+      ]
+    },
+    {
+      "Location": "modules",
+      "Path": "mod-playerbots",
+      "Sources": [
+        {
+          "Index": 1,
+          "Remote": "origin",
+          "Branch": "master_with_prs",
+          "Strategy": "ff-only",
+          "PRs": []
+        },
+        {
+          "Index": 2,
+          "Remote": "upstream",
+          "Branch": "test-staging",
+          "Strategy": "merge",
+          "PRs": [
+            2496,
+            2558,
+            2559,
+            2578,
+            2579,
+            2583,
+            2586,
+            2587,
+            2588,
+            2589,
+            2638,
+            2681,
+            2684,
+            2685
+          ]
+        }
+      ]
+    }
+  ]
+}
