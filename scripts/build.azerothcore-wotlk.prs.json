@@ -24,9 +24,7 @@
           "Remote": "azerothcore",
           "Branch": "master",
           "Strategy": "merge",
-          "PRs": [
-            26661
-          ]
+          "PRs": []
         }
       ]
     },
