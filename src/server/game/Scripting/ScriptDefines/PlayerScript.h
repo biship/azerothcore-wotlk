@@ -881,9 +881,8 @@ public:
      */
     virtual void OnPlayerBeforeGetLevelForXPGain(Player const* /*player*/, uint8& /*level*/) {}
 
-<<<<<<< HEAD
     virtual void OnPlayerTargetChanged(Player* /*player*/, Unit* /*oldTarget*/, Unit* /*newTarget*/) {}
-=======
+
     /**
      * @brief This hook is called after a player takes an item out of a mailbox.
      *
@@ -957,7 +956,6 @@ public:
      * @param spellId The id of the trainer spell that was bought
      */
     virtual void OnPlayerAfterTrainSpell(Player* /*player*/, Creature* /*trainer*/, uint32 /*spellId*/) {}
->>>>>>> refs/remotes/pbazerothcore/test-staging
 };
 
 #endif
