@@ -72,7 +72,6 @@
           "Branch": "test-staging",
           "Strategy": "merge",
           "PRs": [
-            2589,
             2638,
             2681,
             2685
