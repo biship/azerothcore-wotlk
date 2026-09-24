@@ -1547,7 +1547,6 @@ bool World::RescheduleShutdownForWintergrasp()
 void World::ShutdownServ(uint32 time, uint32 options, uint8 exitcode, std::string const& reason)
 {
     // ignore if server shutdown at next tick
-
     if (IsStopped())
         return;
 

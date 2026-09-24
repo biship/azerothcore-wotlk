@@ -776,7 +776,7 @@ void PathGenerator::CreateFilter()
         // they keep off steep mountainsides and follow gentle ground/roads. Real players are unchanged and
         // may still path across steep terrain.
         Player const* player = _source->ToPlayer();
-        if (player && player->GetSession() && player->GetSession()->IsBot())
+        if (player && player->GetSession() && player->GetSession()->IsHeadless())
         {
             includeFlags |= (NAV_GROUND | NAV_WATER);
             excludeFlags |= (NAV_MAGMA | NAV_SLIME | NAV_GROUND_STEEP);
