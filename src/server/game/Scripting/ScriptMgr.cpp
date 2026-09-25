@@ -79,7 +79,6 @@ namespace
         ScriptTypeInfo<OutdoorPvPScript,          0,                       true,      true>,
         ScriptTypeInfo<PetScript,                 PETHOOK_END,             false,     true>,
         ScriptTypeInfo<PlayerScript,              PLAYERHOOK_END,          false,     true>,
-        ScriptTypeInfo<PlayerbotScript,           0,                       false,     true>,
         ScriptTypeInfo<ServerScript,              SERVERHOOK_END,          false,     true>,
         ScriptTypeInfo<SessionScript,             SESSIONHOOK_END>,
         ScriptTypeInfo<SpellSC,                   ALLSPELLHOOK_END,        false,     true>,
@@ -99,7 +98,7 @@ namespace
     static_assert(Acore::size_v<ScriptRegistryTypes> == 49, "Update count when adding a script registry type");
     static_assert(Acore::count_if<ScriptRegistryTypes>([]<typename Info>() { return Info::HasEnabledHooks; }) == 28, "Enabled-hook script type count changed");
     static_assert(Acore::count_if<ScriptRegistryTypes>([]<typename Info>() { return Info::PromotedAfterDbLoad; }) == 14, "After-load script type count changed");
-    static_assert(Acore::count_if<ScriptRegistryTypes>([]<typename Info>() { return Info::LegacyDbValidationCandidate; }) == 35, "Database-check script type count changed");
+    static_assert(Acore::count_if<ScriptRegistryTypes>([]<typename Info>() { return Info::LegacyDbValidationCandidate; }) == 34, "Database-check script type count changed");
 }
 
 struct TSpellSummary
@@ -120,11 +119,6 @@ ScriptMgr* ScriptMgr::instance()
 {
     static ScriptMgr instance;
     return &instance;
-}
-
-PlayerbotScript::PlayerbotScript(char const* name) : ScriptObject(name)
-{
-    ScriptRegistry<PlayerbotScript>::AddScript(this);
 }
 
 void ScriptMgr::Initialize()

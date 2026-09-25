@@ -1215,8 +1215,6 @@ public:                                                 // opcodes handlers
     void SetKicked(bool val) { _kicked = val; }
     bool IsSocketClosed() const;
 
-    void SetAddress(std::string const& address) { m_Address = address; }
-
     /*
      * CALLBACKS
      */

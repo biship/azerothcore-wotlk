@@ -307,12 +307,6 @@ ObjectGuid::LowType WorldSession::GetGuidLow() const
 /// Send a packet to the client
 void WorldSession::SendPacket(WorldPacket const* packet)
 {
-    if (packet->GetOpcode() == NULL_OPCODE)
-    {
-        LOG_ERROR("network.opcode", "{} send NULL_OPCODE", GetPlayerInfo());
-        return;
-    }
-
     sScriptMgr->OnPacketSent(this, *packet);
 
     if (!m_Socket)
@@ -469,9 +463,6 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
 
                         opHandle->Call(this, *packet);
                         LogUnprocessedTail(packet);
-#ifdef MOD_PLAYERBOTS
-                        sScriptMgr->OnPacketReceived(this, *packet);
-#endif
                     }
 
                     // lag can cause STATUS_LOGGEDIN opcodes to arrive after the player started a transfer
@@ -490,9 +481,6 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
 
                         opHandle->Call(this, *packet);
                         LogUnprocessedTail(packet);
-#ifdef MOD_PLAYERBOTS
-                        sScriptMgr->OnPacketReceived(this, *packet);
-#endif
                     }
                     break;
                 case STATUS_TRANSFER:
@@ -503,9 +491,6 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
 
                         opHandle->Call(this, *packet);
                         LogUnprocessedTail(packet);
-#ifdef MOD_PLAYERBOTS
-                        sScriptMgr->OnPacketReceived(this, *packet);
-#endif
                     }
                     break;
                 case STATUS_AUTHED:
@@ -522,9 +507,6 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
 
                     opHandle->Call(this, *packet);
                     LogUnprocessedTail(packet);
-#ifdef MOD_PLAYERBOTS
-                    sScriptMgr->OnPacketReceived(this, *packet);
-#endif
                     break;
                 case STATUS_NEVER:
                     LOG_ERROR("network.opcode", "Received not allowed opcode {} from {}",
@@ -717,8 +699,6 @@ void WorldSession::LogoutPlayer(bool save, bool redirecting)
 
         if (ObjectGuid lguid = _player->GetLootGUID())
             DoLootRelease(lguid);
-
-        sScriptMgr->OnPlayerbotLogout(_player);
 
         ///- If the player just died before logging out, make him appear as a ghost
         //FIXME: logout must be delayed in case lost connection with client in time of combat
