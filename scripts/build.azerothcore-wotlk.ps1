@@ -56,12 +56,16 @@ function Merge-PR {
         [int]$pr_num,
         [string]$remote,
         [string]$branch,
-        [string]$location
+        [string]$location,
+        [string]$sourceUrl
     )
 
     Process {
         Write-Host "------------------------------------------------"
         Write-Host "Processing PR #$pr_num..." -ForegroundColor Cyan
+        if (-not [string]::IsNullOrWhiteSpace($sourceUrl)) {
+            Write-Host "Source: $sourceUrl" -ForegroundColor DarkGray
+        }
 
         # --- 1. Check PR Status via GitHub API ---
 
@@ -813,7 +817,7 @@ function Merge-SourcePrs {
 
     Write-Host "🔀 Processing PRs from $($Source.Remote)/$($Source.Branch)..." -ForegroundColor Cyan
     foreach ($pr in $prs) {
-        Merge-PR -pr_num ([int]$pr) -remote $Source.Remote -branch $Source.Branch -location $Source.Location
+        Merge-PR -pr_num ([int]$pr) -remote $Source.Remote -branch $Source.Branch -location $Source.Location -sourceUrl $Source.Source
     }
 }
 
