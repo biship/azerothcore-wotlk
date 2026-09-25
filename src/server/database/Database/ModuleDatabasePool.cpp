@@ -152,6 +152,22 @@ QueryResult ModuleDatabasePool::Query(std::string_view sql)
     return QueryResult(result);
 }
 
+void ModuleDatabasePool::EscapeString(std::string& str)
+{
+    if (str.empty())
+        return;
+
+    ASSERT(!_connections.empty(), "ModuleDatabasePool::EscapeString requires an open database pool");
+
+    std::string escaped(str.size() * 2 + 1, '\0');
+    MySQLConnection* conn = GetFreeConnection();
+    std::size_t const length = conn->EscapeString(escaped.data(), str.data(), str.size());
+    conn->Unlock();
+
+    escaped.resize(length);
+    str = std::move(escaped);
+}
+
 void ModuleDatabasePool::Execute(PreparedStatementBase* stmt)
 {
     if (_connections.empty())

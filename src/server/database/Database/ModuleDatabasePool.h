@@ -25,6 +25,7 @@
 #include "PreparedStatement.h"
 #include "StringFormat.h"
 #include <memory>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -61,6 +62,9 @@ public:
     void DirectExecute(std::string_view sql) override;
     QueryResult Query(std::string_view sql) override;
     MySQLConnectionInfo const* GetConnectionInfo() const override;
+
+    //! Escape using an open connection's character set, mirroring DatabaseWorkerPool.
+    void EscapeString(std::string& str);
 
     //! Format variants, mirroring DatabaseWorkerPool.
     template<typename... Args>
